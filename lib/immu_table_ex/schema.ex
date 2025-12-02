@@ -1,6 +1,24 @@
 defmodule ImmuTableEx.Schema do
-  @moduledoc false
+  @moduledoc """
+  Schema macro and compile-time hooks for immutable tables.
 
+  Imported automatically by `use ImmuTableEx`.
+  """
+
+  @doc """
+  Defines an Ecto schema with injected version-tracking fields.
+
+  ## Injected Fields
+
+  - `id` (UUID, PK) - UUIDv7 provides time-ordering without database round-trips
+  - `entity_id` (UUID) - Stable ID grouping all versions of the same logical entity
+  - `version` (integer) - Explicit counter (1, 2, 3...) eliminates same-millisecond ambiguity
+  - `valid_from` (utc_datetime_usec) - Enables point-in-time queries
+  - `deleted_at` (utc_datetime_usec) - NULL means active, timestamp preserves when deleted
+
+  Why nullable `deleted_at` instead of boolean? Handles delete/undelete cycles correctly
+  and preserves deletion timestamp for audit purposes.
+  """
   defmacro immutable_schema(source, do: block) do
     quote do
       @primary_key {:id, Ecto.UUID, autogenerate: true}
@@ -17,6 +35,15 @@ defmodule ImmuTableEx.Schema do
     end
   end
 
+  @doc """
+  Compile-time hook injecting `__immutable__/1` and `cast/3` into schemas.
+
+  `__immutable__/1` provides runtime access to options for enforcing constraints.
+
+  `cast/3` silently filters `:version` from allowed fields (unless `:allow_version_write`
+  is true) to prevent version forgery. Silent filtering is safer than raising when
+  changeset code is copied between schemas.
+  """
   defmacro __before_compile__(_env) do
     quote do
       def __immutable__(key) do
