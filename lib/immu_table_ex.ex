@@ -82,4 +82,16 @@ defmodule ImmuTableEx do
   Same as `delete/2` but raises on errors.
   """
   defdelegate delete!(repo, struct), to: ImmuTableEx.Operations
+
+  @doc """
+  Restores a tombstoned entity by inserting a new row with deleted_at nil.
+
+  See `ImmuTableEx.Operations.undelete/2` for details.
+  """
+  defdelegate undelete(repo, struct, changes \\ %{}), to: ImmuTableEx.Operations
+
+  @doc """
+  Same as `undelete/2` but raises on errors.
+  """
+  defdelegate undelete!(repo, struct, changes \\ %{}), to: ImmuTableEx.Operations
 end

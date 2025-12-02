@@ -144,6 +144,84 @@ defmodule ImmuTableEx.Operations do
     end
   end
 
+  @doc """
+  Restores a tombstoned entity by inserting a new row with deleted_at nil.
+
+  The restored row copies all fields from the tombstone and sets:
+  - `deleted_at` to nil
+  - `version` to current version + 1
+  - `valid_from` to current timestamp
+  - new `id` (UUIDv7)
+
+  Optionally accepts changes to apply during undelete (second parameter).
+
+  Uses advisory locks to prevent concurrent operations.
+
+  Returns `{:error, :not_found}` if entity doesn't exist.
+  Returns `{:error, :not_deleted}` if entity is not currently deleted.
+  """
+  def undelete(repo, struct, changes \\ %{})
+
+  def undelete(repo, struct, changes) do
+    repo.transaction(fn ->
+      ImmuTableEx.Lock.with_lock(repo, struct.entity_id, fn ->
+        case fetch_current_version(repo, struct) do
+          {:ok, current} ->
+            if is_nil(current.deleted_at) do
+              repo.rollback(:not_deleted)
+            else
+              changeset = prepare_undelete_changeset(current, changes)
+
+              case repo.insert(changeset) do
+                {:ok, result} -> result
+                {:error, reason} -> repo.rollback(reason)
+              end
+            end
+
+          {:error, :deleted} ->
+            case fetch_latest_version(repo, struct) do
+              {:ok, tombstone} ->
+                changeset = prepare_undelete_changeset(tombstone, changes)
+
+                case repo.insert(changeset) do
+                  {:ok, result} -> result
+                  {:error, reason} -> repo.rollback(reason)
+                end
+
+              {:error, reason} ->
+                repo.rollback(reason)
+            end
+
+          {:error, reason} ->
+            repo.rollback(reason)
+        end
+      end)
+    end)
+    |> case do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Same as `undelete/2` but raises on errors.
+  """
+  def undelete!(repo, struct, changes \\ %{}) do
+    case undelete(repo, struct, changes) do
+      {:ok, result} ->
+        result
+
+      {:error, :not_found} ->
+        raise "Entity not found"
+
+      {:error, :not_deleted} ->
+        raise "Cannot undelete entity that is not deleted"
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        raise Ecto.InvalidChangesetError, changeset: changeset
+    end
+  end
+
   defp prepare_insert_changeset(%Ecto.Changeset{} = changeset) do
     changeset
     |> Ecto.Changeset.put_change(:id, generate_uuid())
@@ -183,6 +261,23 @@ defmodule ImmuTableEx.Operations do
 
       current ->
         {:ok, current}
+    end
+  end
+
+  defp fetch_latest_version(repo, struct) do
+    import Ecto.Query
+    schema = struct.__struct__
+
+    latest =
+      schema
+      |> where(entity_id: ^struct.entity_id)
+      |> order_by(desc: :version)
+      |> limit(1)
+      |> repo.one()
+
+    case latest do
+      nil -> {:error, :not_found}
+      latest -> {:ok, latest}
     end
   end
 
@@ -238,5 +333,46 @@ defmodule ImmuTableEx.Operations do
     |> Ecto.Changeset.put_change(:version, current.version + 1)
     |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
     |> Ecto.Changeset.put_change(:deleted_at, DateTime.utc_now())
+  end
+
+  defp prepare_undelete_changeset(current, %Ecto.Changeset{} = changeset) do
+    current
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.apply_changes()
+    |> Map.from_struct()
+    |> Map.delete(:__meta__)
+    |> then(fn attrs ->
+      Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
+    end)
+    |> Ecto.Changeset.change(changeset.changes)
+    |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:version, current.version + 1)
+    |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+    |> Ecto.Changeset.put_change(:deleted_at, nil)
+    |> then(fn cs ->
+      if changeset.valid? do
+        cs
+      else
+        Enum.reduce(changeset.errors, cs, fn {field, {msg, opts}}, acc ->
+          Ecto.Changeset.add_error(acc, field, msg, opts)
+        end)
+      end
+    end)
+  end
+
+  defp prepare_undelete_changeset(current, changes) when is_map(changes) do
+    current
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.apply_changes()
+    |> Map.from_struct()
+    |> Map.delete(:__meta__)
+    |> Map.merge(changes)
+    |> then(fn attrs ->
+      Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
+    end)
+    |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:version, current.version + 1)
+    |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+    |> Ecto.Changeset.put_change(:deleted_at, nil)
   end
 end

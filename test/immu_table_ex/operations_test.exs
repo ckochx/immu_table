@@ -377,4 +377,153 @@ defmodule ImmuTableEx.OperationsTest do
       end
     end
   end
+
+  describe "undelete/2" do
+    test "creates new row with deleted_at nil" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      assert restored.deleted_at == nil
+    end
+
+    test "increments version from tombstone" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      assert restored.version == 3
+    end
+
+    test "copies all data fields from tombstone" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      assert restored.name == tombstone.name
+      assert Decimal.equal?(restored.balance, tombstone.balance)
+    end
+
+    test "preserves entity_id" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      assert restored.entity_id == v1.entity_id
+    end
+
+    test "creates new id for restored row" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      assert restored.id != tombstone.id
+      assert restored.id != v1.id
+    end
+
+    test "updates valid_from timestamp" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      Process.sleep(10)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      assert DateTime.compare(restored.valid_from, tombstone.valid_from) == :gt
+    end
+
+    test "old rows remain completely untouched" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, _restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      old_v1 = TestRepo.get(Account, v1.id)
+      assert old_v1.deleted_at == nil
+      assert old_v1.version == 1
+
+      old_tombstone = TestRepo.get(Account, tombstone.id)
+      assert old_tombstone.deleted_at != nil
+      assert old_tombstone.version == 2
+    end
+
+    test "persists restored row to database" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone)
+
+      persisted = TestRepo.get(Account, restored.id)
+      assert persisted.id == restored.id
+      assert persisted.version == 3
+      assert persisted.deleted_at == nil
+    end
+
+    test "returns error if entity not found" do
+      fake_account = %Account{
+        id: UUIDv7.generate(),
+        entity_id: UUIDv7.generate(),
+        version: 1
+      }
+
+      assert {:error, :not_found} = ImmuTableEx.undelete(TestRepo, fake_account)
+    end
+
+    test "returns error if entity not deleted" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      assert {:error, :not_deleted} = ImmuTableEx.undelete(TestRepo, v1)
+    end
+
+    test "can undelete with changes" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, restored} = ImmuTableEx.undelete(TestRepo, tombstone, %{balance: 200})
+
+      assert restored.deleted_at == nil
+      assert restored.version == 3
+      assert Decimal.equal?(restored.balance, Decimal.new(200))
+      assert restored.name == "Checking"
+    end
+
+    test "supports delete/undelete cycles" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, v2} = ImmuTableEx.delete(TestRepo, v1)
+      {:ok, v3} = ImmuTableEx.undelete(TestRepo, v2)
+      {:ok, v4} = ImmuTableEx.delete(TestRepo, v3)
+      {:ok, v5} = ImmuTableEx.undelete(TestRepo, v4)
+
+      assert v5.version == 5
+      assert v5.deleted_at == nil
+      assert Decimal.equal?(v5.balance, Decimal.new(100))
+    end
+  end
+
+  describe "undelete!/2" do
+    test "returns restored struct on success" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTableEx.delete(TestRepo, v1)
+      restored = ImmuTableEx.undelete!(TestRepo, tombstone)
+
+      assert %Account{} = restored
+      assert restored.version == 3
+      assert restored.deleted_at == nil
+    end
+
+    test "raises on not found" do
+      fake_account = %Account{
+        id: UUIDv7.generate(),
+        entity_id: UUIDv7.generate(),
+        version: 1
+      }
+
+      assert_raise RuntimeError, fn ->
+        ImmuTableEx.undelete!(TestRepo, fake_account)
+      end
+    end
+
+    test "raises on not deleted" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      assert_raise RuntimeError, fn ->
+        ImmuTableEx.undelete!(TestRepo, v1)
+      end
+    end
+  end
 end

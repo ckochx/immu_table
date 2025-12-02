@@ -11,7 +11,7 @@
 | Phase 3: Insert Operations | ✅ Complete | Insert generates UUIDs, version 1, timestamps |
 | Phase 4: Update Operations | ✅ Complete | Version increment, advisory locks, concurrent safety |
 | Phase 5: Delete Operations | ✅ Complete | Tombstone creation, field copying, error handling |
-| Phase 6: Undelete Operations | ⏳ Pending | - |
+| Phase 6: Undelete Operations | ✅ Complete | Restoration from tombstone, optional changes, delete/undelete cycles |
 | Phase 7: Query Helpers | ⏳ Pending | - |
 | Phase 8: Blocking Repo.update/delete | ⏳ Pending | - |
 | Phase 9: Association Support | ⏳ Pending | - |
@@ -128,6 +128,33 @@
 - `test/immu_table_ex/operations_test.exs` - 14 comprehensive delete tests
 
 **Test Results**: 57/57 tests passing (all delete tests now enabled)
+
+---
+
+### Phase 6 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `undelete/2` and `undelete!/2` operations
+✅ Restores tombstoned entities by creating new row with `deleted_at: nil`
+✅ Copies all data fields from tombstone version
+✅ Increments version number from tombstone
+✅ Updates `valid_from` to current timestamp
+✅ Generates new UUIDv7 for restored `id`
+✅ Preserves `entity_id` across restoration
+✅ Uses advisory locks for concurrency control
+✅ Accepts optional changes to apply during undelete
+✅ Returns error if entity not found
+✅ Returns error if entity not deleted
+✅ Supports delete/undelete cycles correctly
+✅ Old rows (including tombstones) remain untouched
+
+**Files Implemented**:
+- `lib/immu_table_ex/operations.ex` - Added `undelete/2`, `undelete!/2`, `fetch_latest_version/2`, `prepare_undelete_changeset/2`
+- `lib/immu_table_ex.ex` - Delegated public API for undelete operations
+- `test/immu_table_ex/operations_test.exs` - 15 comprehensive undelete tests
+
+**Test Results**: 72/72 tests passing (all CRUD operations complete)
 
 ---
 
