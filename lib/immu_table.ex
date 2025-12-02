@@ -1,4 +1,4 @@
-defmodule ImmuTableEx do
+defmodule ImmuTable do
   @moduledoc """
   Append-only tables with version tracking for Ecto.
 
@@ -12,7 +12,7 @@ defmodule ImmuTableEx do
 
       defmodule MyApp.Account do
         use Ecto.Schema
-        use ImmuTableEx
+        use ImmuTable
 
         immutable_schema "accounts" do
           field :name, :string
@@ -21,9 +21,9 @@ defmodule ImmuTableEx do
       end
 
       # Operations create new versions, never modify existing rows
-      {:ok, v1} = ImmuTableEx.insert(Repo, %Account{name: "Checking"})
-      {:ok, v2} = ImmuTableEx.update(Repo, v1, %{name: "Savings"})
-      {:ok, v3} = ImmuTableEx.delete(Repo, v2)  # tombstone, data preserved
+      {:ok, v1} = ImmuTable.insert(Repo, %Account{name: "Checking"})
+      {:ok, v2} = ImmuTable.update(Repo, v1, %{name: "Savings"})
+      {:ok, v3} = ImmuTable.delete(Repo, v2)  # tombstone, data preserved
 
   ## Options
 
@@ -40,58 +40,58 @@ defmodule ImmuTableEx do
   """
   defmacro __using__(opts) do
     quote do
-      import ImmuTableEx.Schema
+      import ImmuTable.Schema
 
       @immutable_opts unquote(opts)
-      @before_compile ImmuTableEx.Schema
+      @before_compile ImmuTable.Schema
     end
   end
 
   @doc """
   Inserts version 1 of a new entity.
 
-  See `ImmuTableEx.Operations.insert/2` for details.
+  See `ImmuTable.Operations.insert/2` for details.
   """
-  defdelegate insert(repo, struct_or_changeset), to: ImmuTableEx.Operations
+  defdelegate insert(repo, struct_or_changeset), to: ImmuTable.Operations
 
   @doc """
   Same as `insert/2` but raises on validation errors.
   """
-  defdelegate insert!(repo, struct_or_changeset), to: ImmuTableEx.Operations
+  defdelegate insert!(repo, struct_or_changeset), to: ImmuTable.Operations
 
   @doc """
   Creates a new version by inserting a new row.
 
-  See `ImmuTableEx.Operations.update/3` for details.
+  See `ImmuTable.Operations.update/3` for details.
   """
-  defdelegate update(repo, struct, changes_or_changeset), to: ImmuTableEx.Operations
+  defdelegate update(repo, struct, changes_or_changeset), to: ImmuTable.Operations
 
   @doc """
   Same as `update/3` but raises on errors.
   """
-  defdelegate update!(repo, struct, changes_or_changeset), to: ImmuTableEx.Operations
+  defdelegate update!(repo, struct, changes_or_changeset), to: ImmuTable.Operations
 
   @doc """
   Creates a tombstone by inserting a new row with deleted_at set.
 
-  See `ImmuTableEx.Operations.delete/2` for details.
+  See `ImmuTable.Operations.delete/2` for details.
   """
-  defdelegate delete(repo, struct), to: ImmuTableEx.Operations
+  defdelegate delete(repo, struct), to: ImmuTable.Operations
 
   @doc """
   Same as `delete/2` but raises on errors.
   """
-  defdelegate delete!(repo, struct), to: ImmuTableEx.Operations
+  defdelegate delete!(repo, struct), to: ImmuTable.Operations
 
   @doc """
   Restores a tombstoned entity by inserting a new row with deleted_at nil.
 
-  See `ImmuTableEx.Operations.undelete/2` for details.
+  See `ImmuTable.Operations.undelete/2` for details.
   """
-  defdelegate undelete(repo, struct, changes \\ %{}), to: ImmuTableEx.Operations
+  defdelegate undelete(repo, struct, changes \\ %{}), to: ImmuTable.Operations
 
   @doc """
   Same as `undelete/2` but raises on errors.
   """
-  defdelegate undelete!(repo, struct, changes \\ %{}), to: ImmuTableEx.Operations
+  defdelegate undelete!(repo, struct, changes \\ %{}), to: ImmuTable.Operations
 end

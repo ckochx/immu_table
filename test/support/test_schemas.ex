@@ -1,6 +1,6 @@
-defmodule ImmuTableEx.Test.Account do
+defmodule ImmuTable.Test.Account do
   use Ecto.Schema
-  use ImmuTableEx
+  use ImmuTable
 
   immutable_schema "accounts" do
     field(:name, :string)
@@ -8,9 +8,9 @@ defmodule ImmuTableEx.Test.Account do
   end
 end
 
-defmodule ImmuTableEx.Test.Post do
+defmodule ImmuTable.Test.Post do
   use Ecto.Schema
-  use ImmuTableEx, allow_version_write: true
+  use ImmuTable, allow_version_write: true
 
   immutable_schema "posts" do
     field(:title, :string)
@@ -18,9 +18,9 @@ defmodule ImmuTableEx.Test.Post do
   end
 end
 
-defmodule ImmuTableEx.Test.Comment do
+defmodule ImmuTable.Test.Comment do
   use Ecto.Schema
-  use ImmuTableEx, allow_updates: true, allow_deletes: true
+  use ImmuTable, allow_updates: true, allow_deletes: true
 
   immutable_schema "comments" do
     field(:body, :string)

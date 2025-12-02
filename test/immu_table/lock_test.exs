@@ -1,7 +1,7 @@
-defmodule ImmuTableEx.LockTest do
-  use ImmuTableEx.DataCase, async: false
+defmodule ImmuTable.LockTest do
+  use ImmuTable.DataCase, async: false
 
-  alias ImmuTableEx.Lock
+  alias ImmuTable.Lock
 
   describe "with_lock/3" do
     test "acquires and releases advisory lock" do

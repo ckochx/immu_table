@@ -1,9 +1,9 @@
-defmodule ImmuTableEx.SchemaTest do
+defmodule ImmuTable.SchemaTest do
   use ExUnit.Case, async: true
 
-  alias ImmuTableEx.Test.Account
-  alias ImmuTableEx.Test.Post
-  alias ImmuTableEx.Test.Comment
+  alias ImmuTable.Test.Account
+  alias ImmuTable.Test.Post
+  alias ImmuTable.Test.Comment
 
   describe "immutable_schema/2" do
     test "injects id field as UUIDv7 primary key" do

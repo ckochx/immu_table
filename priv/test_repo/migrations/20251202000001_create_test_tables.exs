@@ -1,4 +1,4 @@
-defmodule ImmuTableEx.TestRepo.Migrations.CreateTestTables do
+defmodule ImmuTable.TestRepo.Migrations.CreateTestTables do
   use Ecto.Migration
 
   def change do

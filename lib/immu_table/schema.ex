@@ -1,8 +1,8 @@
-defmodule ImmuTableEx.Schema do
+defmodule ImmuTable.Schema do
   @moduledoc """
   Schema macro and compile-time hooks for immutable tables.
 
-  Imported automatically by `use ImmuTableEx`.
+  Imported automatically by `use ImmuTable`.
   """
 
   @doc """

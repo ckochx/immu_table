@@ -1,4 +1,4 @@
-defmodule ImmuTableEx.Lock do
+defmodule ImmuTable.Lock do
   @moduledoc """
   PostgreSQL advisory locks for serializing concurrent operations.
 
@@ -25,7 +25,7 @@ defmodule ImmuTableEx.Lock do
 
   ## Example
 
-      ImmuTableEx.Lock.with_lock(Repo, entity_id, fn ->
+      ImmuTable.Lock.with_lock(Repo, entity_id, fn ->
         # Critical section - only one process can be here per entity_id
       end)
   """

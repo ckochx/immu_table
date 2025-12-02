@@ -1,9 +1,9 @@
-defmodule ImmuTableEx.MixProject do
+defmodule ImmuTable.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :immu_table_ex,
+      app: :immu_table,
       version: "0.1.0",
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
@@ -27,7 +27,7 @@ defmodule ImmuTableEx.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {ImmuTableEx.Application, []}
+      mod: {ImmuTable.Application, []}
     ]
   end
 

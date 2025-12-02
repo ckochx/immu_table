@@ -1,4 +1,4 @@
-defmodule ImmuTableEx.Application do
+defmodule ImmuTable.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
@@ -9,12 +9,12 @@ defmodule ImmuTableEx.Application do
   def start(_type, _args) do
     children = children(Mix.env())
 
-    opts = [strategy: :one_for_one, name: ImmuTableEx.Supervisor]
+    opts = [strategy: :one_for_one, name: ImmuTable.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
   defp children(:test) do
-    [ImmuTableEx.TestRepo]
+    [ImmuTable.TestRepo]
   end
 
   defp children(_env) do

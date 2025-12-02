@@ -1,4 +1,4 @@
-defmodule ImmuTableEx.Operations do
+defmodule ImmuTable.Operations do
   @moduledoc """
   Core operations for immutable tables.
 
@@ -19,8 +19,8 @@ defmodule ImmuTableEx.Operations do
 
   ## Examples
 
-      ImmuTableEx.insert(Repo, %Account{name: "Checking"})
-      ImmuTableEx.insert(Repo, Account.changeset(%Account{}, attrs))
+      ImmuTable.insert(Repo, %Account{name: "Checking"})
+      ImmuTable.insert(Repo, Account.changeset(%Account{}, attrs))
   """
   def insert(repo, struct_or_changeset) do
     changeset = prepare_insert_changeset(struct_or_changeset)
@@ -51,7 +51,7 @@ defmodule ImmuTableEx.Operations do
   """
   def update(repo, struct, changes_or_changeset) do
     repo.transaction(fn ->
-      ImmuTableEx.Lock.with_lock(repo, struct.entity_id, fn ->
+      ImmuTable.Lock.with_lock(repo, struct.entity_id, fn ->
         case fetch_current_version(repo, struct) do
           {:ok, current} ->
             changeset = prepare_update_changeset(current, changes_or_changeset)
@@ -107,7 +107,7 @@ defmodule ImmuTableEx.Operations do
   """
   def delete(repo, struct) do
     repo.transaction(fn ->
-      ImmuTableEx.Lock.with_lock(repo, struct.entity_id, fn ->
+      ImmuTable.Lock.with_lock(repo, struct.entity_id, fn ->
         case fetch_current_version(repo, struct) do
           {:ok, current} ->
             changeset = prepare_delete_changeset(current)
@@ -164,7 +164,7 @@ defmodule ImmuTableEx.Operations do
 
   def undelete(repo, struct, changes) do
     repo.transaction(fn ->
-      ImmuTableEx.Lock.with_lock(repo, struct.entity_id, fn ->
+      ImmuTable.Lock.with_lock(repo, struct.entity_id, fn ->
         case fetch_current_version(repo, struct) do
           {:ok, current} ->
             if is_nil(current.deleted_at) do

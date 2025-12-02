@@ -1,4 +1,4 @@
-# ImmuTableEx Implementation Plan
+# ImmuTable Implementation Plan
 
 ## Status
 
@@ -42,7 +42,7 @@
 
 **Completed**: 2025-12-02
 
-✅ Implemented `use ImmuTableEx` macro with options parsing
+✅ Implemented `use ImmuTable` macro with options parsing
 ✅ Created `immutable_schema/2` macro wrapping `Ecto.Schema.schema/2`
 ✅ Injected required fields: `entity_id`, `version`, `valid_from`, `deleted_at`
 ✅ Configured UUIDv7 as primary key type
@@ -160,7 +160,7 @@
 
 ## Overview
 
-ImmuTableEx is an Elixir library that makes Ecto tables immutable. Instead of updating or deleting rows, new rows are inserted with version tracking metadata. This provides a complete audit trail and enables point-in-time queries.
+ImmuTable is an Elixir library that makes Ecto tables immutable. Instead of updating or deleting rows, new rows are inserted with version tracking metadata. This provides a complete audit trail and enables point-in-time queries.
 
 ## Core Concepts
 
@@ -217,8 +217,8 @@ Uses PostgreSQL advisory locks on `entity_id` during update/delete operations to
 By default, `Repo.update` and `Repo.delete` are blocked on immutable schemas. Configurable via:
 
 ```elixir
-use ImmuTableEx, allow_updates: true
-use ImmuTableEx, allow_deletes: true
+use ImmuTable, allow_updates: true
+use ImmuTable, allow_deletes: true
 ```
 
 ---
@@ -228,7 +228,7 @@ use ImmuTableEx, allow_deletes: true
 ```elixir
 defmodule MyApp.Account do
   use Ecto.Schema
-  use ImmuTableEx
+  use ImmuTable
 
   immutable_schema "accounts" do
     field :name, :string
@@ -239,29 +239,29 @@ defmodule MyApp.Account do
 end
 
 # Insert
-{:ok, account} = ImmuTableEx.insert(Repo, %Account{name: "Checking", balance: 100})
+{:ok, account} = ImmuTable.insert(Repo, %Account{name: "Checking", balance: 100})
 # => %Account{id: <uuid>, entity_id: <uuid>, version: 1, ...}
 
 # Update (creates new version)
-{:ok, updated} = ImmuTableEx.update(Repo, account, %{balance: 150})
+{:ok, updated} = ImmuTable.update(Repo, account, %{balance: 150})
 # => %Account{id: <new-uuid>, entity_id: <same-uuid>, version: 2, ...}
 
 # Delete (creates tombstone)
-{:ok, deleted} = ImmuTableEx.delete(Repo, account)
+{:ok, deleted} = ImmuTable.delete(Repo, account)
 # => %Account{..., version: 3, deleted_at: ~U[...]}
 
 # Undelete
-{:ok, restored} = ImmuTableEx.undelete(Repo, deleted)
+{:ok, restored} = ImmuTable.undelete(Repo, deleted)
 # => %Account{..., version: 4, deleted_at: nil}
 
 # Query current versions
-Account |> ImmuTableEx.current() |> Repo.all()
+Account |> ImmuTable.current() |> Repo.all()
 
 # Query history
-Account |> ImmuTableEx.history(entity_id) |> Repo.all()
+Account |> ImmuTable.history(entity_id) |> Repo.all()
 
 # Query at point in time
-Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
+Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 ```
 
 ---
@@ -293,10 +293,10 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 
 ### Phase 2: Schema Macro & Field Injection
 
-**Objective**: Implement `use ImmuTableEx` macro that injects required fields.
+**Objective**: Implement `use ImmuTable` macro that injects required fields.
 
 **Tasks**:
-- Create `ImmuTableEx.Schema` module
+- Create `ImmuTable.Schema` module
 - Implement `__using__/1` macro with options parsing
 - Create `immutable_schema/2` macro wrapping `Ecto.Schema.schema/2`
 - Inject fields: `entity_id`, `version`, `valid_from`, `deleted_at`
@@ -321,7 +321,7 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 **Objective**: Implement insert that auto-generates immutability metadata.
 
 **Tasks**:
-- Create `ImmuTableEx.Operations` module
+- Create `ImmuTable.Operations` module
 - Implement `insert/2` and `insert!/2`
 - Generate UUIDv7 for `id` and `entity_id`
 - Set `version: 1`, `valid_from: DateTime.utc_now()`
@@ -348,7 +348,7 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 
 **Tasks**:
 - Implement `update/3` and `update!/3`
-- Create `ImmuTableEx.Lock` module for advisory locks
+- Create `ImmuTable.Lock` module for advisory locks
 - Acquire advisory lock on `entity_id`
 - Fetch current version number from database
 - Insert new row with: same `entity_id`, `version + 1`, new `valid_from`, merged changes
@@ -431,7 +431,7 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 **Objective**: Implement query composable functions for immutable tables.
 
 **Tasks**:
-- Create `ImmuTableEx.Query` module
+- Create `ImmuTable.Query` module
 - Implement `current/1` - latest version per entity where `deleted_at IS NULL`
 - Implement `history/2` - all versions of entity ordered by version
 - Implement `at_time/2` - version valid at specific timestamp
@@ -461,10 +461,10 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 **Objective**: Prevent direct Repo operations on immutable schemas.
 
 **Tasks**:
-- Create `ImmuTableEx.Changeset` module
+- Create `ImmuTable.Changeset` module
 - Implement blocking via `Ecto.Changeset.prepare_changes/2`
 - Store `__immutable__` metadata in schema
-- Create `ImmuTableEx.ImmutableViolationError` exception
+- Create `ImmuTable.ImmutableViolationError` exception
 - Raise on blocked operations
 - Respect `allow_updates: true` option
 - Respect `allow_deletes: true` option
@@ -489,7 +489,7 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 **Objective**: Implement immutable-aware associations.
 
 **Tasks**:
-- Create `ImmuTableEx.Associations` module
+- Create `ImmuTable.Associations` module
 - Implement `immutable_belongs_to/3` macro
 - Store `{field}_entity_id` instead of `{field}_id`
 - Implement preload helper that resolves to current versions
@@ -515,7 +515,7 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 **Objective**: Provide helpers for creating immutable tables.
 
 **Tasks**:
-- Create `ImmuTableEx.Migration` module
+- Create `ImmuTable.Migration` module
 - Implement `create_immutable_table/2` macro
 - Auto-add required columns with correct types
 - Generate recommended indexes:
@@ -541,7 +541,7 @@ Account |> ImmuTableEx.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 **Objective**: Replace `uuidv7` dependency with minimal internal implementation.
 
 **Tasks**:
-- Create `ImmuTableEx.UUID` module
+- Create `ImmuTable.UUID` module
 - Implement UUIDv7 generation per RFC 9562
 - Use millisecond timestamp + random bits
 - Ensure monotonicity within same millisecond (counter or random)
@@ -616,7 +616,7 @@ priv/
 ## Configuration Options
 
 ```elixir
-use ImmuTableEx,
+use ImmuTable,
   allow_updates: false,        # Permit Repo.update (default: false)
   allow_deletes: false,        # Permit Repo.delete (default: false)
   allow_version_write: false   # Permit writing version field (default: false)
