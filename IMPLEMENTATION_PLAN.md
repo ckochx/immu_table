@@ -7,8 +7,8 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: Project Setup | ✅ Complete | All dependencies installed, project compiles without warnings |
-| Phase 2: Schema Macro & Field Injection | 🔜 Next | - |
-| Phase 3: Insert Operations | ⏳ Pending | - |
+| Phase 2: Schema Macro & Field Injection | ✅ Complete | All fields injected, changeset filtering working, options stored |
+| Phase 3: Insert Operations | 🔜 Next | - |
 | Phase 4: Update Operations | ⏳ Pending | - |
 | Phase 5: Delete Operations | ⏳ Pending | - |
 | Phase 6: Undelete Operations | ⏳ Pending | - |
@@ -35,6 +35,28 @@
 - `test/support/test_repo.ex` - Test repository
 - `test/support/data_case.ex` - Test case template with sandbox
 - Stub modules: `schema.ex`, `operations.ex`, `query.ex`, `lock.ex`, `changeset.ex`, `associations.ex`, `migration.ex`, `exceptions.ex`
+
+---
+
+### Phase 2 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `use ImmuTableEx` macro with options parsing
+✅ Created `immutable_schema/2` macro wrapping `Ecto.Schema.schema/2`
+✅ Injected required fields: `entity_id`, `version`, `valid_from`, `deleted_at`
+✅ Configured UUIDv7 as primary key type
+✅ Implemented changeset filtering via custom `cast/3` function
+✅ Stored options in module attributes accessible via `__immutable__/1`
+
+**Files Implemented**:
+- `lib/immu_table_ex.ex` - `__using__/1` macro
+- `lib/immu_table_ex/schema.ex` - `immutable_schema/2` macro, `__before_compile__/1` callback
+- `test/support/test_schemas.ex` - Test schemas with various configurations
+- `test/immu_table_ex/schema_test.exs` - Comprehensive tests (12 tests, all passing)
+- `docker-compose.yml` - PostgreSQL test database configuration
+
+**Test Results**: 13/13 tests passing, compiles without warnings
 
 ---
 
