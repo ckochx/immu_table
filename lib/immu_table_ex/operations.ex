@@ -37,6 +37,60 @@ defmodule ImmuTableEx.Operations do
     repo.insert!(changeset)
   end
 
+  @doc """
+  Creates a new version by inserting a new row with incremented version.
+
+  The previous row remains untouched. Accepts a struct (from a previous query)
+  and either a map of changes or a changeset.
+
+  Uses advisory locks to prevent concurrent updates from creating duplicate
+  version numbers.
+
+  Returns `{:error, :not_found}` if entity doesn't exist.
+  Returns `{:error, :deleted}` if entity is deleted.
+  """
+  def update(repo, struct, changes_or_changeset) do
+    repo.transaction(fn ->
+      ImmuTableEx.Lock.with_lock(repo, struct.entity_id, fn ->
+        case fetch_current_version(repo, struct) do
+          {:ok, current} ->
+            changeset = prepare_update_changeset(current, changes_or_changeset)
+
+            case repo.insert(changeset) do
+              {:ok, result} -> result
+              {:error, reason} -> repo.rollback(reason)
+            end
+
+          {:error, reason} ->
+            repo.rollback(reason)
+        end
+      end)
+    end)
+    |> case do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Same as `update/3` but raises on errors.
+  """
+  def update!(repo, struct, changes_or_changeset) do
+    case update(repo, struct, changes_or_changeset) do
+      {:ok, result} ->
+        result
+
+      {:error, :not_found} ->
+        raise "Entity not found"
+
+      {:error, :deleted} ->
+        raise "Cannot update deleted entity"
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        raise Ecto.InvalidChangesetError, changeset: changeset
+    end
+  end
+
   defp prepare_insert_changeset(%Ecto.Changeset{} = changeset) do
     changeset
     |> Ecto.Changeset.put_change(:id, generate_uuid())
@@ -54,5 +108,67 @@ defmodule ImmuTableEx.Operations do
 
   defp generate_uuid do
     UUIDv7.generate()
+  end
+
+  defp fetch_current_version(repo, struct) do
+    import Ecto.Query
+    schema = struct.__struct__
+
+    current =
+      schema
+      |> where(entity_id: ^struct.entity_id)
+      |> order_by(desc: :version)
+      |> limit(1)
+      |> repo.one()
+
+    case current do
+      nil ->
+        {:error, :not_found}
+
+      %{deleted_at: deleted_at} when not is_nil(deleted_at) ->
+        {:error, :deleted}
+
+      current ->
+        {:ok, current}
+    end
+  end
+
+  defp prepare_update_changeset(current, %Ecto.Changeset{} = changeset) do
+    current
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.apply_changes()
+    |> Map.from_struct()
+    |> Map.delete(:__meta__)
+    |> then(fn attrs ->
+      Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
+    end)
+    |> Ecto.Changeset.change(changeset.changes)
+    |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:version, current.version + 1)
+    |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+    |> then(fn cs ->
+      if changeset.valid? do
+        cs
+      else
+        Enum.reduce(changeset.errors, cs, fn {field, {msg, opts}}, acc ->
+          Ecto.Changeset.add_error(acc, field, msg, opts)
+        end)
+      end
+    end)
+  end
+
+  defp prepare_update_changeset(current, changes) when is_map(changes) do
+    current
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.apply_changes()
+    |> Map.from_struct()
+    |> Map.delete(:__meta__)
+    |> Map.merge(changes)
+    |> then(fn attrs ->
+      Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
+    end)
+    |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:version, current.version + 1)
+    |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
   end
 end

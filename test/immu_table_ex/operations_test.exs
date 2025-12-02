@@ -102,4 +102,152 @@ defmodule ImmuTableEx.OperationsTest do
       end
     end
   end
+
+  describe "update/3" do
+    test "creates new row with incremented version" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, v2} = ImmuTableEx.update(TestRepo, v1, %{balance: 200})
+
+      assert v2.version == 2
+      assert v2.id != v1.id
+    end
+
+    test "preserves entity_id across versions" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, v2} = ImmuTableEx.update(TestRepo, v1, %{balance: 200})
+
+      assert v2.entity_id == v1.entity_id
+    end
+
+    test "applies changes to new row" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, v2} = ImmuTableEx.update(TestRepo, v1, %{balance: 200})
+
+      assert Decimal.equal?(v2.balance, Decimal.new(200))
+      assert v2.name == "Checking"
+    end
+
+    test "updates valid_from timestamp" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      Process.sleep(10)
+      {:ok, v2} = ImmuTableEx.update(TestRepo, v1, %{balance: 200})
+
+      assert DateTime.compare(v2.valid_from, v1.valid_from) == :gt
+    end
+
+    test "old row remains completely untouched" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, _v2} = ImmuTableEx.update(TestRepo, v1, %{balance: 200})
+
+      old = TestRepo.get(Account, v1.id)
+      assert old.id == v1.id
+      assert old.version == 1
+      assert Decimal.equal?(old.balance, Decimal.new(100))
+      assert old.valid_from == v1.valid_from
+    end
+
+    test "works with changeset input" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      changeset = Account.cast(%Account{}, %{balance: 300}, [:balance])
+      {:ok, v2} = ImmuTableEx.update(TestRepo, v1, changeset)
+
+      assert Decimal.equal?(v2.balance, Decimal.new(300))
+      assert v2.version == 2
+    end
+
+    test "works with map input" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, v2} = ImmuTableEx.update(TestRepo, v1, %{balance: 150})
+
+      assert Decimal.equal?(v2.balance, Decimal.new(150))
+      assert v2.version == 2
+    end
+
+    test "returns error if entity not found" do
+      fake_account = %Account{
+        id: UUIDv7.generate(),
+        entity_id: UUIDv7.generate(),
+        version: 1
+      }
+
+      assert {:error, :not_found} = ImmuTableEx.update(TestRepo, fake_account, %{balance: 100})
+    end
+
+    @tag :skip
+    test "returns error if entity is deleted" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, deleted} = ImmuTableEx.delete(TestRepo, v1)
+
+      assert {:error, :deleted} = ImmuTableEx.update(TestRepo, deleted, %{balance: 200})
+    end
+
+    test "concurrent updates serialize correctly" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      task1 =
+        Task.async(fn ->
+          ImmuTableEx.update(TestRepo, v1, %{balance: 200})
+        end)
+
+      task2 =
+        Task.async(fn ->
+          ImmuTableEx.update(TestRepo, v1, %{balance: 300})
+        end)
+
+      results = [Task.await(task1), Task.await(task2)]
+      assert Enum.all?(results, fn {status, _} -> status == :ok end)
+
+      [v2, v3] = Enum.map(results, fn {:ok, account} -> account end) |> Enum.sort_by(& &1.version)
+
+      assert v2.version == 2
+      assert v3.version == 3
+      assert v2.entity_id == v1.entity_id
+      assert v3.entity_id == v1.entity_id
+    end
+
+    test "returns error for invalid changeset" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      changeset =
+        Account.cast(%Account{}, %{name: nil}, [:name])
+        |> Ecto.Changeset.validate_required([:name])
+
+      assert {:error, changeset} = ImmuTableEx.update(TestRepo, v1, changeset)
+      refute changeset.valid?
+    end
+  end
+
+  describe "update!/3" do
+    test "returns struct on success" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      v2 = ImmuTableEx.update!(TestRepo, v1, %{balance: 200})
+
+      assert %Account{} = v2
+      assert v2.version == 2
+    end
+
+    test "raises on not found" do
+      fake_account = %Account{
+        id: UUIDv7.generate(),
+        entity_id: UUIDv7.generate(),
+        version: 1
+      }
+
+      assert_raise RuntimeError, fn ->
+        ImmuTableEx.update!(TestRepo, fake_account, %{balance: 100})
+      end
+    end
+
+    test "raises on invalid changeset" do
+      {:ok, v1} = ImmuTableEx.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      changeset =
+        Account.cast(%Account{}, %{name: nil}, [:name])
+        |> Ecto.Changeset.validate_required([:name])
+
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        ImmuTableEx.update!(TestRepo, v1, changeset)
+      end
+    end
+  end
 end

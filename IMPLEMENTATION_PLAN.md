@@ -9,8 +9,8 @@
 | Phase 1: Project Setup | ✅ Complete | All dependencies installed, project compiles without warnings |
 | Phase 2: Schema Macro & Field Injection | ✅ Complete | All fields injected, changeset filtering working, options stored |
 | Phase 3: Insert Operations | ✅ Complete | Insert generates UUIDs, version 1, timestamps |
-| Phase 4: Update Operations | 🔜 Next | - |
-| Phase 5: Delete Operations | ⏳ Pending | - |
+| Phase 4: Update Operations | ✅ Complete | Version increment, advisory locks, concurrent safety |
+| Phase 5: Delete Operations | 🔜 Next | - |
 | Phase 6: Undelete Operations | ⏳ Pending | - |
 | Phase 7: Query Helpers | ⏳ Pending | - |
 | Phase 8: Blocking Repo.update/delete | ⏳ Pending | - |
@@ -79,6 +79,30 @@
 - `config/config.exs` - Added ecto_repos configuration
 
 **Test Results**: 25/25 tests passing, compiles without warnings
+
+---
+
+### Phase 4 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `update/3` and `update!/3` operations
+✅ Creates new version row with incremented version number
+✅ Old rows remain completely untouched (append-only)
+✅ Advisory locks prevent concurrent version conflicts
+✅ Fetches current version from database before updating
+✅ Handles not found and deleted entity errors
+✅ Works with map and changeset inputs
+✅ Concurrent updates serialize correctly via PostgreSQL locks
+
+**Files Implemented**:
+- `lib/immu_table_ex/operations.ex` - Update operations with version increment
+- `lib/immu_table_ex/lock.ex` - PostgreSQL advisory lock wrapper
+- `lib/immu_table_ex.ex` - Delegated public API for update
+- `test/immu_table_ex/operations_test.exs` - 14 update tests including concurrency
+- `test/immu_table_ex/lock_test.exs` - 4 advisory lock tests
+
+**Test Results**: 43/43 tests passing (1 skipped for Phase 5)
 
 ---
 

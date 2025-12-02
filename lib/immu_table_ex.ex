@@ -58,4 +58,16 @@ defmodule ImmuTableEx do
   Same as `insert/2` but raises on validation errors.
   """
   defdelegate insert!(repo, struct_or_changeset), to: ImmuTableEx.Operations
+
+  @doc """
+  Creates a new version by inserting a new row.
+
+  See `ImmuTableEx.Operations.update/3` for details.
+  """
+  defdelegate update(repo, struct, changes_or_changeset), to: ImmuTableEx.Operations
+
+  @doc """
+  Same as `update/3` but raises on errors.
+  """
+  defdelegate update!(repo, struct, changes_or_changeset), to: ImmuTableEx.Operations
 end
