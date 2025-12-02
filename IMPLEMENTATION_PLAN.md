@@ -12,7 +12,7 @@
 | Phase 4: Update Operations | ✅ Complete | Version increment, advisory locks, concurrent safety |
 | Phase 5: Delete Operations | ✅ Complete | Tombstone creation, field copying, error handling |
 | Phase 6: Undelete Operations | ✅ Complete | Restoration from tombstone, optional changes, delete/undelete cycles |
-| Phase 7: Query Helpers | ⏳ Pending | - |
+| Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted |
 | Phase 8: Blocking Repo.update/delete | ⏳ Pending | - |
 | Phase 9: Association Support | ⏳ Pending | - |
 | Phase 10: Migration Helpers | ⏳ Pending | - |
@@ -155,6 +155,42 @@
 - `test/immu_table_ex/operations_test.exs` - 15 comprehensive undelete tests
 
 **Test Results**: 72/72 tests passing (all CRUD operations complete)
+
+---
+
+### Phase 7 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `current/1` - returns latest non-deleted version of each entity
+✅ Implemented `history/2` - returns all versions of a specific entity
+✅ Implemented `at_time/2` - returns versions valid at specific timestamp
+✅ Implemented `all_versions/1` - returns all rows without filtering
+✅ Implemented `include_deleted/1` - returns latest versions including tombstones
+✅ All query helpers compose with standard Ecto queries
+✅ Efficient implementation using subqueries with max(version)
+✅ Handles delete/undelete cycles correctly
+
+**Files Implemented**:
+- `lib/immu_table/query.ex` - All query helper functions with composable design
+- `test/immu_table/query_test.exs` - 18 comprehensive query tests
+
+**Test Results**: 117/117 tests passing (99 existing + 18 query tests)
+
+**Query Helper Examples**:
+```elixir
+# Get current (non-deleted) users
+User |> ImmuTable.Query.current() |> Repo.all()
+
+# Get complete history of a user
+User |> ImmuTable.Query.history(entity_id) |> Repo.all()
+
+# Time travel query
+User |> ImmuTable.Query.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
+
+# Include deleted in results
+User |> ImmuTable.Query.include_deleted() |> Repo.all()
+```
 
 ---
 
