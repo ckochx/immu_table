@@ -46,4 +46,16 @@ defmodule ImmuTableEx do
       @before_compile ImmuTableEx.Schema
     end
   end
+
+  @doc """
+  Inserts version 1 of a new entity.
+
+  See `ImmuTableEx.Operations.insert/2` for details.
+  """
+  defdelegate insert(repo, struct_or_changeset), to: ImmuTableEx.Operations
+
+  @doc """
+  Same as `insert/2` but raises on validation errors.
+  """
+  defdelegate insert!(repo, struct_or_changeset), to: ImmuTableEx.Operations
 end

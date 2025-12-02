@@ -8,8 +8,8 @@
 |-------|--------|-------|
 | Phase 1: Project Setup | ✅ Complete | All dependencies installed, project compiles without warnings |
 | Phase 2: Schema Macro & Field Injection | ✅ Complete | All fields injected, changeset filtering working, options stored |
-| Phase 3: Insert Operations | 🔜 Next | - |
-| Phase 4: Update Operations | ⏳ Pending | - |
+| Phase 3: Insert Operations | ✅ Complete | Insert generates UUIDs, version 1, timestamps |
+| Phase 4: Update Operations | 🔜 Next | - |
 | Phase 5: Delete Operations | ⏳ Pending | - |
 | Phase 6: Undelete Operations | ⏳ Pending | - |
 | Phase 7: Query Helpers | ⏳ Pending | - |
@@ -57,6 +57,28 @@
 - `docker-compose.yml` - PostgreSQL test database configuration
 
 **Test Results**: 13/13 tests passing, compiles without warnings
+
+---
+
+### Phase 3 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `insert/2` and `insert!/2` operations
+✅ Auto-generates UUIDv7 for `id` and `entity_id`
+✅ Sets `version: 1` for initial insert
+✅ Sets `valid_from` to current timestamp
+✅ Ensures `deleted_at: nil`
+✅ Works with both struct and changeset inputs
+
+**Files Implemented**:
+- `lib/immu_table_ex/operations.ex` - Core insert operations
+- `lib/immu_table_ex.ex` - Delegated public API
+- `test/immu_table_ex/operations_test.exs` - Comprehensive tests (12 tests)
+- `priv/test_repo/migrations/20251202000001_create_test_tables.exs` - Test database schema
+- `config/config.exs` - Added ecto_repos configuration
+
+**Test Results**: 25/25 tests passing, compiles without warnings
 
 ---
 
