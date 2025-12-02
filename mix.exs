@@ -1,0 +1,41 @@
+defmodule ImmuTableEx.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :immu_table_ex,
+      version: "0.1.0",
+      elixir: "~> 1.19",
+      start_permanent: Mix.env() == :prod,
+      deps: deps(),
+      elixirc_paths: elixirc_paths(Mix.env()),
+      aliases: aliases(),
+      elixirc_options: [warnings_as_errors: true]
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  defp aliases do
+    [
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+    ]
+  end
+
+  # Run "mix help compile.app" to learn about applications.
+  def application do
+    [
+      extra_applications: [:logger],
+      mod: {ImmuTableEx.Application, []}
+    ]
+  end
+
+  defp deps do
+    [
+      {:ecto_sql, "~> 3.10"},
+      {:uuidv7, "~> 0.2"},
+      {:postgrex, "~> 0.17", only: [:dev, :test]}
+    ]
+  end
+end
