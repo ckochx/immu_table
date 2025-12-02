@@ -70,4 +70,16 @@ defmodule ImmuTableEx do
   Same as `update/3` but raises on errors.
   """
   defdelegate update!(repo, struct, changes_or_changeset), to: ImmuTableEx.Operations
+
+  @doc """
+  Creates a tombstone by inserting a new row with deleted_at set.
+
+  See `ImmuTableEx.Operations.delete/2` for details.
+  """
+  defdelegate delete(repo, struct), to: ImmuTableEx.Operations
+
+  @doc """
+  Same as `delete/2` but raises on errors.
+  """
+  defdelegate delete!(repo, struct), to: ImmuTableEx.Operations
 end

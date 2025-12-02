@@ -91,6 +91,59 @@ defmodule ImmuTableEx.Operations do
     end
   end
 
+  @doc """
+  Creates a tombstone by inserting a new row with deleted_at set.
+
+  The tombstone copies all fields from the current version and sets:
+  - `deleted_at` to current timestamp
+  - `version` to current version + 1
+  - `valid_from` to current timestamp
+  - new `id` (UUIDv7)
+
+  Uses advisory locks to prevent concurrent operations.
+
+  Returns `{:error, :not_found}` if entity doesn't exist.
+  Returns `{:error, :deleted}` if entity is already deleted.
+  """
+  def delete(repo, struct) do
+    repo.transaction(fn ->
+      ImmuTableEx.Lock.with_lock(repo, struct.entity_id, fn ->
+        case fetch_current_version(repo, struct) do
+          {:ok, current} ->
+            changeset = prepare_delete_changeset(current)
+
+            case repo.insert(changeset) do
+              {:ok, result} -> result
+              {:error, reason} -> repo.rollback(reason)
+            end
+
+          {:error, reason} ->
+            repo.rollback(reason)
+        end
+      end)
+    end)
+    |> case do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Same as `delete/2` but raises on errors.
+  """
+  def delete!(repo, struct) do
+    case delete(repo, struct) do
+      {:ok, result} ->
+        result
+
+      {:error, :not_found} ->
+        raise "Entity not found"
+
+      {:error, :deleted} ->
+        raise "Cannot delete already deleted entity"
+    end
+  end
+
   defp prepare_insert_changeset(%Ecto.Changeset{} = changeset) do
     changeset
     |> Ecto.Changeset.put_change(:id, generate_uuid())
@@ -170,5 +223,20 @@ defmodule ImmuTableEx.Operations do
     |> Ecto.Changeset.put_change(:id, generate_uuid())
     |> Ecto.Changeset.put_change(:version, current.version + 1)
     |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+  end
+
+  defp prepare_delete_changeset(current) do
+    current
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.apply_changes()
+    |> Map.from_struct()
+    |> Map.delete(:__meta__)
+    |> then(fn attrs ->
+      Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
+    end)
+    |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:version, current.version + 1)
+    |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+    |> Ecto.Changeset.put_change(:deleted_at, DateTime.utc_now())
   end
 end
