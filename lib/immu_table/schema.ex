@@ -66,6 +66,34 @@ defmodule ImmuTable.Schema do
 
         Ecto.Changeset.cast(struct_or_changeset, params, allowed_fields)
       end
+
+      def maybe_block_updates(changeset, module) do
+        if module.__immutable__(:allow_updates) do
+          changeset
+        else
+          ImmuTable.Changeset.block_updates(changeset, module)
+        end
+      end
+
+      def maybe_block_deletes(changeset, module) do
+        if module.__immutable__(:allow_deletes) do
+          changeset
+        else
+          ImmuTable.Changeset.block_deletes(changeset, module)
+        end
+      end
+
+      if Module.defines?(__MODULE__, {:changeset, 2}) do
+        :ok
+      else
+        def changeset(struct_or_changeset, params \\ %{}) do
+          changeset = Ecto.Changeset.change(struct_or_changeset, params)
+
+          changeset
+          |> maybe_block_updates(__MODULE__)
+          |> maybe_block_deletes(__MODULE__)
+        end
+      end
     end
   end
 end

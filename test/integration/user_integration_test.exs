@@ -499,6 +499,74 @@ defmodule ImmuTable.UserIntegrationTest do
     end
   end
 
+  describe "blocking direct Repo operations" do
+    test "TestRepo.update raises ImmutableViolationError" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "walter@test.com", name: "Walter", status: "active"})
+        )
+
+      changeset = User.changeset(user, %{name: "Walter Updated"})
+
+      assert_raise ImmuTable.ImmutableViolationError, fn ->
+        TestRepo.update(changeset)
+      end
+    end
+
+    test "TestRepo.delete raises ImmutableViolationError" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "xavier@test.com", name: "Xavier", status: "active"})
+        )
+
+      changeset = User.changeset(user)
+
+      assert_raise ImmuTable.ImmutableViolationError, fn ->
+        TestRepo.delete(changeset)
+      end
+    end
+
+    test "error message for update includes helpful guidance" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "yolanda@test.com", name: "Yolanda", status: "active"})
+        )
+
+      changeset = User.changeset(user, %{name: "Yolanda Updated"})
+
+      error =
+        assert_raise ImmuTable.ImmutableViolationError, fn ->
+          TestRepo.update(changeset)
+        end
+
+      assert error.message =~ "ImmuTable.update"
+      assert error.message =~ "ImmuTable.Test.User"
+      assert error.message =~ "immutable schema"
+    end
+
+    test "error message for delete includes helpful guidance" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "zara@test.com", name: "Zara", status: "active"})
+        )
+
+      changeset = User.changeset(user)
+
+      error =
+        assert_raise ImmuTable.ImmutableViolationError, fn ->
+          TestRepo.delete(changeset)
+        end
+
+      assert error.message =~ "ImmuTable.delete"
+      assert error.message =~ "ImmuTable.Test.User"
+      assert error.message =~ "immutable schema"
+    end
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->

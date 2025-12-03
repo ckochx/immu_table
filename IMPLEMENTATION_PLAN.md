@@ -13,7 +13,7 @@
 | Phase 5: Delete Operations | ✅ Complete | Tombstone creation, field copying, error handling |
 | Phase 6: Undelete Operations | ✅ Complete | Restoration from tombstone, optional changes, delete/undelete cycles |
 | Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted |
-| Phase 8: Blocking Repo.update/delete | ⏳ Pending | - |
+| Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks direct Repo operations via prepare_changes |
 | Phase 9: Association Support | ⏳ Pending | - |
 | Phase 10: Migration Helpers | ⏳ Pending | - |
 | Phase 11: Custom UUIDv7 Implementation | ⏳ Pending | - |
@@ -191,6 +191,37 @@ User |> ImmuTable.Query.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 # Include deleted in results
 User |> ImmuTable.Query.include_deleted() |> Repo.all()
 ```
+
+---
+
+### Phase 8 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `ImmuTable.ImmutableViolationError` exception
+✅ Created blocking logic via `Ecto.Changeset.prepare_changes/2`
+✅ Injected `maybe_block_updates/2` and `maybe_block_deletes/2` helpers
+✅ Auto-inject blocking into schemas without custom changeset
+✅ Provided helper functions for schemas with custom changesets
+✅ Respected `allow_updates: true` and `allow_deletes: true` options
+✅ Clear, actionable error messages guide users to correct API
+
+**Files Implemented**:
+- `lib/immu_table/exceptions.ex` - `ImmuTable.ImmutableViolationError` exception
+- `lib/immu_table/changeset.ex` - `block_updates/2` and `block_deletes/2` functions
+- `lib/immu_table/schema.ex` - Injected blocking helpers and optional default changeset
+- `test/immu_table/blocking_test.exs` - 8 comprehensive blocking tests
+- `test/integration/user_integration_test.exs` - 4 additional blocking scenarios
+- `priv/test_repo/migrations/20251202000003_create_blocking_test_tables.exs` - Test tables for blocking tests
+
+**Test Results**: 129/129 tests passing (117 existing + 8 blocking tests + 4 integration tests)
+
+**Implementation Notes**:
+- Blocking happens via `prepare_changes` callback, executed during transaction
+- Default `changeset/2` function injected for schemas without custom implementation
+- Schemas with custom changesets call `maybe_block_updates/2` and `maybe_block_deletes/2` explicitly
+- Conditional compilation: only inject default changeset if not already defined
+- Error messages include schema name and suggest using `ImmuTable.update/3` or `ImmuTable.delete/2`
 
 ---
 

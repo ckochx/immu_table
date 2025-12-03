@@ -18,6 +18,8 @@ defmodule ImmuTable.Test.User do
     field(:last_login_at, :utc_datetime_usec)
   end
 
+  def changeset(user, attrs \\ %{})
+
   def changeset(user, attrs) do
     user
     |> cast(attrs, [:email, :name, :age, :status, :last_login_at])
@@ -25,5 +27,7 @@ defmodule ImmuTable.Test.User do
     |> validate_format(:email, ~r/@/)
     |> validate_inclusion(:status, ["active", "inactive", "suspended"])
     |> validate_number(:age, greater_than: 0, less_than: 150)
+    |> maybe_block_updates(__MODULE__)
+    |> maybe_block_deletes(__MODULE__)
   end
 end
