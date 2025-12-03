@@ -16,7 +16,7 @@ defmodule ImmuTable.QueryTest do
       {:ok, v2} = ImmuTable.update(TestRepo, v1, %{name: "Alice Updated"})
       {:ok, _v3} = ImmuTable.update(TestRepo, v2, %{name: "Alice Final"})
 
-      results = User |> ImmuTable.Query.current() |> TestRepo.all()
+      results = User |> ImmuTable.Query.get_current() |> TestRepo.all()
 
       assert length(results) == 1
       assert hd(results).name == "Alice Final"
@@ -29,10 +29,11 @@ defmodule ImmuTable.QueryTest do
           TestRepo,
           User.changeset(%User{}, %{email: "bob@test.com", name: "Bob", status: "active"})
         )
+      {:ok, _user1_v2} = ImmuTable.update(TestRepo, v1, %{name: "Bob Updated"})
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
 
-      results = User |> ImmuTable.Query.current() |> TestRepo.all()
+      results = User |> ImmuTable.Query.get_current() |> TestRepo.all()
 
       assert results == []
     end
@@ -47,7 +48,7 @@ defmodule ImmuTable.QueryTest do
       {:ok, v2} = ImmuTable.delete(TestRepo, v1)
       {:ok, _v3} = ImmuTable.undelete(TestRepo, v2)
 
-      results = User |> ImmuTable.Query.current() |> TestRepo.all()
+      results = User |> ImmuTable.Query.get_current() |> TestRepo.all()
 
       assert length(results) == 1
       assert hd(results).version == 3
@@ -69,7 +70,7 @@ defmodule ImmuTable.QueryTest do
 
       {:ok, _user1_v2} = ImmuTable.update(TestRepo, user1, %{name: "Dave Updated"})
 
-      results = User |> ImmuTable.Query.current() |> TestRepo.all() |> Enum.sort_by(& &1.email)
+      results = User |> ImmuTable.Query.get_current() |> TestRepo.all() |> Enum.sort_by(& &1.email)
 
       assert length(results) == 2
       assert Enum.at(results, 0).name == "Dave Updated"
@@ -91,7 +92,7 @@ defmodule ImmuTable.QueryTest do
 
       results =
         User
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> where([u], u.status == "active")
         |> TestRepo.all()
 
@@ -120,7 +121,7 @@ defmodule ImmuTable.QueryTest do
 
       results =
         User
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> order_by([u], u.name)
         |> limit(2)
         |> TestRepo.all()
@@ -400,7 +401,7 @@ defmodule ImmuTable.QueryTest do
     end
   end
 
-  describe "get_current/3" do
+  describe "fetch_current/3" do
     test "returns {:ok, record} for existing non-deleted entity" do
       {:ok, v1} =
         ImmuTable.insert(
@@ -410,7 +411,7 @@ defmodule ImmuTable.QueryTest do
 
       {:ok, _v2} = ImmuTable.update(TestRepo, v1, %{name: "Zara Updated"})
 
-      assert {:ok, result} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+      assert {:ok, result} = ImmuTable.Query.fetch_current(User, TestRepo, v1.entity_id)
       assert result.name == "Zara Updated"
       assert result.version == 2
       assert result.deleted_at == nil
@@ -425,13 +426,13 @@ defmodule ImmuTable.QueryTest do
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
 
-      assert {:error, :deleted} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+      assert {:error, :deleted} = ImmuTable.Query.fetch_current(User, TestRepo, v1.entity_id)
     end
 
     test "returns {:error, :not_found} for non-existent entity" do
       fake_entity_id = UUIDv7.generate()
 
-      assert {:error, :not_found} = ImmuTable.Query.get_current(User, TestRepo, fake_entity_id)
+      assert {:error, :not_found} = ImmuTable.Query.fetch_current(User, TestRepo, fake_entity_id)
     end
 
     test "returns {:ok, record} for undeleted entity" do
@@ -444,7 +445,7 @@ defmodule ImmuTable.QueryTest do
       {:ok, v2} = ImmuTable.delete(TestRepo, v1)
       {:ok, _v3} = ImmuTable.undelete(TestRepo, v2, %{name: "Beth Restored"})
 
-      assert {:ok, result} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+      assert {:ok, result} = ImmuTable.Query.fetch_current(User, TestRepo, v1.entity_id)
       assert result.name == "Beth Restored"
       assert result.version == 3
       assert result.deleted_at == nil
@@ -468,15 +469,15 @@ defmodule ImmuTable.QueryTest do
         )
 
       # Deleted entity returns :deleted
-      assert {:error, :deleted} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+      assert {:error, :deleted} = ImmuTable.Query.fetch_current(User, TestRepo, v1.entity_id)
 
       # Active entity returns :ok
-      assert {:ok, result} = ImmuTable.Query.get_current(User, TestRepo, v2.entity_id)
+      assert {:ok, result} = ImmuTable.Query.fetch_current(User, TestRepo, v2.entity_id)
       assert result.name == "Dana"
 
       # Non-existent entity returns :not_found
       fake_id = UUIDv7.generate()
-      assert {:error, :not_found} = ImmuTable.Query.get_current(User, TestRepo, fake_id)
+      assert {:error, :not_found} = ImmuTable.Query.fetch_current(User, TestRepo, fake_id)
     end
 
     test "works via top-level ImmuTable module delegation" do
@@ -486,8 +487,8 @@ defmodule ImmuTable.QueryTest do
           User.changeset(%User{}, %{email: "ella@test.com", name: "Ella", status: "active"})
         )
 
-      # Should work via ImmuTable.get_current (delegated)
-      assert {:ok, result} = ImmuTable.get_current(User, TestRepo, v1.entity_id)
+      # Should work via ImmuTable.fetch_current (delegated)
+      assert {:ok, result} = ImmuTable.fetch_current(User, TestRepo, v1.entity_id)
       assert result.name == "Ella"
     end
   end

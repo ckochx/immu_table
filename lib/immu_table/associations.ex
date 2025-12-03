@@ -97,7 +97,7 @@ defmodule ImmuTable.Associations do
         []
       else
         assoc_module
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> where([a], a.entity_id in ^entity_ids)
         |> repo.all()
       end
@@ -125,7 +125,7 @@ defmodule ImmuTable.Associations do
 
       assoc_record =
         assoc_module
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> where([a], a.entity_id == ^entity_id)
         |> repo.one()
 
@@ -154,7 +154,7 @@ defmodule ImmuTable.Associations do
         []
       else
         assoc_module
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> where([a], field(a, ^foreign_key) in ^parent_entity_ids)
         |> repo.all()
       end
@@ -179,7 +179,7 @@ defmodule ImmuTable.Associations do
 
     assoc_records =
       assoc_module
-      |> ImmuTable.Query.current()
+      |> ImmuTable.Query.get_current()
       |> where([a], field(a, ^foreign_key) == ^struct.entity_id)
       |> repo.all()
 
@@ -205,7 +205,7 @@ defmodule ImmuTable.Associations do
         []
       else
         assoc_module
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> where([a], field(a, ^foreign_key) in ^parent_entity_ids)
         |> repo.all()
       end
@@ -232,7 +232,7 @@ defmodule ImmuTable.Associations do
 
     assoc_record =
       assoc_module
-      |> ImmuTable.Query.current()
+      |> ImmuTable.Query.get_current()
       |> where([a], field(a, ^foreign_key) == ^struct.entity_id)
       |> limit(1)
       |> repo.one()
@@ -249,7 +249,7 @@ defmodule ImmuTable.Associations do
 
     current_assoc_query =
       assoc_module
-      |> ImmuTable.Query.current()
+      |> ImmuTable.Query.get_current()
 
     from(q in query,
       join: a in subquery(current_assoc_query),

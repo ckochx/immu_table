@@ -21,7 +21,77 @@
 
 ---
 
-## Latest Fixes Applied (2025-12-03 PM)
+## Latest Fixes Applied (2025-12-03 PM Session 2)
+
+### Fix 7: Query Behavior for Deleted Entities ✅
+
+**Location**: `lib/immu_table/query.ex:140`, `lib/immu_table.ex:119`
+
+Added `get_current/3` function that returns tuple indicating entity status:
+- `{:ok, record}` - Entity exists and is not deleted
+- `{:error, :deleted}` - Entity exists but is deleted (tombstoned)
+- `{:error, :not_found}` - Entity does not exist
+
+**Implementation**: Uses simple query ordering by version DESC with limit 1, then pattern matches on `deleted_at` field.
+
+**Tests Added**: 6 new tests verify all three return states and delegation.
+
+**Usage Example**:
+```elixir
+case ImmuTable.get_current(User, TestRepo, entity_id) do
+  {:ok, user} -> {:ok, user}
+  {:error, :deleted} -> {:error, "User was deleted"}
+  {:error, :not_found} -> {:error, "User not found"}
+end
+```
+
+### Fix 8: has_many and has_one Associations ✅
+
+**Location**: `lib/immu_table/associations.ex:21-241`
+
+Added inverse association support:
+- `immutable_has_many/3` macro for one-to-many relationships
+- `immutable_has_one/3` macro for one-to-one relationships
+- Both require `:foreign_key` option to specify child's reference field
+- Batch preloading implemented for O(1) query performance
+
+**Implementation**:
+- Association types tracked via `:type` option in metadata
+- Separate preload functions for each association type
+- `has_many` groups children by parent entity_id
+- `has_one` takes first record per parent (handles multiple gracefully)
+- All associations filter by current versions only
+
+**Tests Added**: 10 new tests covering preload, updates, deletions, and batch operations.
+
+**Usage Example**:
+```elixir
+defmodule Organization do
+  use ImmuTable
+
+  immutable_schema "organizations" do
+    field :name, :string
+    immutable_has_many :projects, Project, foreign_key: :organization_entity_id
+  end
+end
+
+defmodule Project do
+  use ImmuTable
+
+  immutable_schema "projects" do
+    field :title, :string
+    immutable_belongs_to :organization, Organization
+  end
+end
+
+# Preload works seamlessly
+org = ImmuTable.preload(org, Repo, :projects)
+assert length(org.projects) == 5
+```
+
+---
+
+## Latest Fixes Applied (2025-12-03 PM Session 1)
 
 ### Fix 4: Migration Indexes Helper ✅
 
@@ -66,6 +136,37 @@ Added comprehensive integration tests:
 **Tests Added**: 5 new integration tests with real table creation.
 
 **Test Count**: 168 tests total, all passing.
+
+---
+
+## Summary
+
+### Completed Phases
+All 10 implementation phases are now complete:
+- ✅ Phase 1-8: Core functionality (insert, update, delete, undelete, queries, blocking)
+- ✅ Phase 9: Association support (belongs_to, has_many, has_one with batch preloading)
+- ✅ Phase 10: Migration helpers (create_immutable_table, add_immutable_indexes)
+
+### High & Medium Priority Issues Resolved
+- ✅ Migration index helper
+- ✅ Preload optimization (O(N²) → O(1))
+- ✅ Migration integration tests
+- ✅ Query behavior for deleted entities
+- ✅ Inverse associations (has_many, has_one)
+
+### Test Coverage
+- **184 tests, 0 failures**
+- Comprehensive coverage of all CRUD operations
+- Integration tests for migrations
+- Association preloading in all scenarios
+
+### Remaining Work
+All remaining issues are LOW priority:
+- Typespecs for public API
+- Ecto.Multi integration docs
+- Batch operations (insert_all, update_all)
+- Hardcoded timestamp source
+- README improvements
 
 ---
 
@@ -144,27 +245,6 @@ end
 
 ## Remaining Issues
 
-### Issue 2: Query Behavior for Deleted Entities [MEDIUM]
-
-**Problem**: When using `ImmuTable.Query.current/1` and the latest version is deleted, the entity is excluded from results. This is correct, but there's no way to distinguish "entity doesn't exist" from "entity exists but is deleted" when querying by entity_id.
-
-**Current behavior**:
-```elixir
-# Returns [] for both cases:
-# 1. Entity never existed
-# 2. Entity exists but is deleted
-Account |> Query.current() |> where(entity_id: ^some_id) |> Repo.all()
-```
-
-**Decision needed**: Should we provide a helper that returns `{:ok, record}`, `{:error, :not_found}`, or `{:error, :deleted}`?
-
-**Options**:
-1. Add `get_current/2` that returns error tuples
-2. Return `nil` for not found, `{:deleted, tombstone}` for deleted
-3. Keep current behavior, users use `include_deleted/1` when they need to distinguish
-
----
-
 ### Issue 3: Association Support - Ecto Integration [MEDIUM]
 
 **Location**: `lib/immu_table/associations.ex`
@@ -186,9 +266,9 @@ Account |> Query.current() |> where(entity_id: ^some_id) |> Repo.all()
 
 ## Other Issues
 
-### Issue 5: Missing has_many/has_one Inverse Associations [MEDIUM]
+### Issue 5: Missing has_many/has_one Inverse Associations [MEDIUM → FIXED]
 
-Only `immutable_belongs_to` exists. No way to define the inverse side.
+**Status**: ✅ Fixed - `immutable_has_many/3` and `immutable_has_one/3` added with batch preloading support.
 
 ---
 
@@ -253,9 +333,10 @@ README lacks usage examples, migration setup guide, query helper examples.
 1. ✅ ~~Add indexes to add_immutable_columns or create `add_immutable_indexes/1` macro [HIGH]~~ - FIXED
 2. ✅ ~~Optimize preload to batch queries (O(N²) → O(1))~~ - FIXED
 3. ✅ ~~Add migration integration tests~~ - FIXED
-4. **Decide on query behavior for deleted entities** - error tuples vs current filtering
-5. **Add typespecs and improve documentation**
-6. **Consider full Ecto integration for associations** (has_many, cast_assoc, etc.)
+4. ✅ ~~Decide on query behavior for deleted entities~~ - FIXED (added get_current/3)
+5. ✅ ~~Add has_many/has_one inverse associations~~ - FIXED
+6. **Add typespecs and improve documentation**
+7. **Consider full Ecto integration for associations** (cast_assoc, Repo.preload, etc.)
 
 ### Phase 1 Completion Details
 

@@ -115,7 +115,7 @@ defmodule ImmuTable do
   Fetches the current version of an entity by entity_id.
 
   Returns `{:ok, record}`, `{:error, :deleted}`, or `{:error, :not_found}`.
-  See `ImmuTable.Query.get_current/3` for details.
+  See `ImmuTable.Query.fetch_current/3` for details.
   """
-  defdelegate get_current(queryable, repo, entity_id), to: ImmuTable.Query
+  defdelegate fetch_current(queryable, repo, entity_id), to: ImmuTable.Query
 end

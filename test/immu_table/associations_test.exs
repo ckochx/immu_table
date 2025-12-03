@@ -211,7 +211,7 @@ defmodule ImmuTable.AssociationsTest do
 
       projects =
         Project
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> where([p], p.organization_entity_id == ^org1.entity_id)
         |> TestRepo.all()
 
@@ -232,7 +232,7 @@ defmodule ImmuTable.AssociationsTest do
 
       results =
         Project
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> ImmuTable.join(:organization)
         |> select([p, _p_current, org], {p.title, org.name})
         |> TestRepo.all()
@@ -255,7 +255,7 @@ defmodule ImmuTable.AssociationsTest do
 
       results =
         Project
-        |> ImmuTable.Query.current()
+        |> ImmuTable.Query.get_current()
         |> ImmuTable.join(:organization)
         |> select([p, _p_current, org], {p.title, org.name})
         |> TestRepo.all()

@@ -17,15 +17,15 @@ defmodule ImmuTable.Query do
   ## Examples
 
       User
-      |> ImmuTable.Query.current()
+      |> ImmuTable.Query.get_current()
       |> Repo.all()
 
       User
-      |> ImmuTable.Query.current()
+      |> ImmuTable.Query.get_current()
       |> where([u], u.status == "active")
       |> Repo.all()
   """
-  def current(queryable) do
+  def get_current(queryable) do
     queryable
     |> subquery_latest_versions()
     |> where([u], is_nil(u.deleted_at))
@@ -118,12 +118,12 @@ defmodule ImmuTable.Query do
   - `{:error, :not_found}` - Entity does not exist
 
   This is useful when you need to distinguish between "entity doesn't exist"
-  and "entity exists but is deleted", which `current/1` cannot do since it
+  and "entity exists but is deleted", which `get_current/1` cannot do since it
   filters out deleted entities.
 
   ## Examples
 
-      case ImmuTable.Query.get_current(User, repo, user_entity_id) do
+      case ImmuTable.Query.fetch_current(User, repo, user_entity_id) do
         {:ok, user} ->
           # User exists and is active
           IO.puts("User: \#{user.name}")
@@ -137,7 +137,7 @@ defmodule ImmuTable.Query do
           IO.puts("User not found")
       end
   """
-  def get_current(queryable, repo, entity_id) do
+  def fetch_current(queryable, repo, entity_id) do
     latest_version =
       queryable
       |> where([u], u.entity_id == ^entity_id)
