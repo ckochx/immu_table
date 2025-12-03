@@ -15,7 +15,7 @@
 | Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted |
 | Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks direct Repo operations via prepare_changes |
 | Phase 9: Association Support | ✅ Complete | immutable_belongs_to, preload, join helpers |
-| Phase 10: Migration Helpers | ⏳ Pending | - |
+| Phase 10: Migration Helpers | ✅ Complete | create_immutable_table, add_immutable_columns macros |
 | Phase 11: Custom UUIDv7 Implementation | ⏳ Pending | - |
 
 ### Phase 1 Completion Details
@@ -256,6 +256,49 @@ User |> ImmuTable.Query.include_deleted() |> Repo.all()
 - Association metadata stored at compile time via `@immutable_associations` attribute
 - Runtime access via `__associations__/0` function returns map of `%{name => {module, opts}}`
 - Join bindings require accounting for `current()` subquery binding when using positional references
+
+---
+
+### Phase 10 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Created `ImmuTable.Migration` module with helper macros
+✅ Implemented `create_immutable_table/2` macro for creating tables
+✅ Auto-adds all required immutable columns (id, entity_id, version, valid_from, deleted_at)
+✅ Auto-creates recommended indexes (entity_id, entity_id+version composite, valid_from)
+✅ Supports custom columns in do block
+✅ Implemented `add_immutable_columns/0` macro for converting existing tables
+✅ Comprehensive documentation with usage examples
+✅ Macros merge provided options with defaults (primary_key: false)
+
+**Files Implemented**:
+- `lib/immu_table/migration.ex` - Migration helper macros with documentation
+- `test/immu_table/migration_test.exs` - 4 tests verifying macro exports and documentation
+
+**Test Results**: 146/146 tests passing (142 existing + 4 migration tests)
+
+**Implementation Notes**:
+- `create_immutable_table` sets `primary_key: false` and creates uuid id column
+- Automatically adds three indexes: entity_id, (entity_id, version), valid_from
+- `add_immutable_columns` for use in `alter table` blocks when converting existing tables
+- Macros expand at compile time to generate standard Ecto.Migration code
+- Users import `ImmuTable.Migration` in their migration modules
+
+**Usage Example**:
+```elixir
+defmodule MyApp.Repo.Migrations.CreateUsers do
+  use Ecto.Migration
+  import ImmuTable.Migration
+
+  def change do
+    create_immutable_table :users do
+      add :email, :string
+      add :name, :string
+    end
+  end
+end
+```
 
 ---
 
