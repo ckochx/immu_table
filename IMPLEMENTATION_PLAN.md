@@ -16,7 +16,6 @@
 | Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks direct Repo operations via prepare_changes |
 | Phase 9: Association Support | ✅ Complete | immutable_belongs_to, preload, join helpers |
 | Phase 10: Migration Helpers | ✅ Complete | create_immutable_table, add_immutable_columns macros |
-| Phase 11: Custom UUIDv7 Implementation | ⏳ Pending | - |
 
 ### Phase 1 Completion Details
 
@@ -31,7 +30,7 @@
 **Files Created**:
 - `mix.exs` - Project configuration with dependencies
 - `config/config.exs`, `config/test.exs` - Configuration files
-- `lib/immu_table_ex/application.ex` - Supervisor with TestRepo in test env
+- `lib/immu_table/application.ex` - Supervisor with TestRepo in test env
 - `test/support/test_repo.ex` - Test repository
 - `test/support/data_case.ex` - Test case template with sandbox
 - Stub modules: `schema.ex`, `operations.ex`, `query.ex`, `lock.ex`, `changeset.ex`, `associations.ex`, `migration.ex`, `exceptions.ex`
@@ -50,10 +49,10 @@
 ✅ Stored options in module attributes accessible via `__immutable__/1`
 
 **Files Implemented**:
-- `lib/immu_table_ex.ex` - `__using__/1` macro
-- `lib/immu_table_ex/schema.ex` - `immutable_schema/2` macro, `__before_compile__/1` callback
+- `lib/immu_table.ex` - `__using__/1` macro
+- `lib/immu_table/schema.ex` - `immutable_schema/2` macro, `__before_compile__/1` callback
 - `test/support/test_schemas.ex` - Test schemas with various configurations
-- `test/immu_table_ex/schema_test.exs` - Comprehensive tests (12 tests, all passing)
+- `test/immu_table/schema_test.exs` - Comprehensive tests (12 tests, all passing)
 - `docker-compose.yml` - PostgreSQL test database configuration
 
 **Test Results**: 13/13 tests passing, compiles without warnings
@@ -72,9 +71,9 @@
 ✅ Works with both struct and changeset inputs
 
 **Files Implemented**:
-- `lib/immu_table_ex/operations.ex` - Core insert operations
-- `lib/immu_table_ex.ex` - Delegated public API
-- `test/immu_table_ex/operations_test.exs` - Comprehensive tests (12 tests)
+- `lib/immu_table/operations.ex` - Core insert operations
+- `lib/immu_table.ex` - Delegated public API
+- `test/immu_table/operations_test.exs` - Comprehensive tests (12 tests)
 - `priv/test_repo/migrations/20251202000001_create_test_tables.exs` - Test database schema
 - `config/config.exs` - Added ecto_repos configuration
 
@@ -96,11 +95,11 @@
 ✅ Concurrent updates serialize correctly via PostgreSQL locks
 
 **Files Implemented**:
-- `lib/immu_table_ex/operations.ex` - Update operations with version increment
-- `lib/immu_table_ex/lock.ex` - PostgreSQL advisory lock wrapper
-- `lib/immu_table_ex.ex` - Delegated public API for update
-- `test/immu_table_ex/operations_test.exs` - 14 update tests including concurrency
-- `test/immu_table_ex/lock_test.exs` - 4 advisory lock tests
+- `lib/immu_table/operations.ex` - Update operations with version increment
+- `lib/immu_table/lock.ex` - PostgreSQL advisory lock wrapper
+- `lib/immu_table.ex` - Delegated public API for update
+- `test/immu_table/operations_test.exs` - 14 update tests including concurrency
+- `test/immu_table/lock_test.exs` - 4 advisory lock tests
 
 **Test Results**: 43/43 tests passing (1 skipped for Phase 5)
 
@@ -123,9 +122,9 @@
 ✅ Old rows remain completely untouched (append-only)
 
 **Files Implemented**:
-- `lib/immu_table_ex/operations.ex` - Added `delete/2`, `delete!/2`, `prepare_delete_changeset/1`
-- `lib/immu_table_ex.ex` - Delegated public API for delete operations
-- `test/immu_table_ex/operations_test.exs` - 14 comprehensive delete tests
+- `lib/immu_table/operations.ex` - Added `delete/2`, `delete!/2`, `prepare_delete_changeset/1`
+- `lib/immu_table.ex` - Delegated public API for delete operations
+- `test/immu_table/operations_test.exs` - 14 comprehensive delete tests
 
 **Test Results**: 57/57 tests passing (all delete tests now enabled)
 
@@ -150,9 +149,9 @@
 ✅ Old rows (including tombstones) remain untouched
 
 **Files Implemented**:
-- `lib/immu_table_ex/operations.ex` - Added `undelete/2`, `undelete!/2`, `fetch_latest_version/2`, `prepare_undelete_changeset/2`
-- `lib/immu_table_ex.ex` - Delegated public API for undelete operations
-- `test/immu_table_ex/operations_test.exs` - 15 comprehensive undelete tests
+- `lib/immu_table/operations.ex` - Added `undelete/2`, `undelete!/2`, `fetch_latest_version/2`, `prepare_undelete_changeset/2`
+- `lib/immu_table.ex` - Delegated public API for undelete operations
+- `test/immu_table/operations_test.exs` - 15 comprehensive undelete tests
 
 **Test Results**: 72/72 tests passing (all CRUD operations complete)
 
@@ -428,8 +427,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 
 **Files**:
 - `mix.exs`
-- `lib/immu_table_ex.ex`
-- `lib/immu_table_ex/application.ex`
+- `lib/immu_table.ex`
+- `lib/immu_table/application.ex`
 - `config/config.exs`
 - `config/test.exs`
 
@@ -454,8 +453,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Options correctly parsed and stored in module attributes
 
 **Files**:
-- `lib/immu_table_ex/schema.ex`
-- `test/immu_table_ex/schema_test.exs`
+- `lib/immu_table/schema.ex`
+- `test/immu_table/schema_test.exs`
 - `test/support/test_schemas.ex`
 
 ---
@@ -481,8 +480,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Works with struct input
 
 **Files**:
-- `lib/immu_table_ex/operations.ex`
-- `test/immu_table_ex/operations_test.exs`
+- `lib/immu_table/operations.ex`
+- `test/immu_table/operations_test.exs`
 
 ---
 
@@ -511,10 +510,10 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Returns error if entity is deleted (tombstoned)
 
 **Files**:
-- `lib/immu_table_ex/operations.ex` (extend)
-- `lib/immu_table_ex/lock.ex`
-- `test/immu_table_ex/lock_test.exs`
-- `test/immu_table_ex/operations_test.exs` (extend)
+- `lib/immu_table/operations.ex` (extend)
+- `lib/immu_table/lock.ex`
+- `test/immu_table/lock_test.exs`
+- `test/immu_table/operations_test.exs` (extend)
 
 ---
 
@@ -539,8 +538,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Returns error if entity not found
 
 **Files**:
-- `lib/immu_table_ex/operations.ex` (extend)
-- `test/immu_table_ex/operations_test.exs` (extend)
+- `lib/immu_table/operations.ex` (extend)
+- `test/immu_table/operations_test.exs` (extend)
 
 ---
 
@@ -565,8 +564,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Optional changes applied during undelete
 
 **Files**:
-- `lib/immu_table_ex/operations.ex` (extend)
-- `test/immu_table_ex/operations_test.exs` (extend)
+- `lib/immu_table/operations.ex` (extend)
+- `test/immu_table/operations_test.exs` (extend)
 
 ---
 
@@ -595,8 +594,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - All helpers compose with other Ecto queries
 
 **Files**:
-- `lib/immu_table_ex/query.ex`
-- `test/immu_table_ex/query_test.exs`
+- `lib/immu_table/query.ex`
+- `test/immu_table/query_test.exs`
 
 ---
 
@@ -622,9 +621,9 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Error messages are helpful
 
 **Files**:
-- `lib/immu_table_ex/changeset.ex`
-- `lib/immu_table_ex/exceptions.ex`
-- `test/immu_table_ex/blocking_test.exs`
+- `lib/immu_table/changeset.ex`
+- `lib/immu_table/exceptions.ex`
+- `test/immu_table/blocking_test.exs`
 
 ---
 
@@ -649,8 +648,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Graceful handling of deleted associations
 
 **Files**:
-- `lib/immu_table_ex/associations.ex`
-- `test/immu_table_ex/associations_test.exs`
+- `lib/immu_table/associations.ex`
+- `test/immu_table/associations_test.exs`
 
 ---
 
@@ -675,34 +674,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 - Conversion helper adds columns to existing table
 
 **Files**:
-- `lib/immu_table_ex/migration.ex`
-- `test/immu_table_ex/migration_test.exs`
-
----
-
-### Phase 11: Custom UUIDv7 Implementation
-
-**Objective**: Replace `uuidv7` dependency with minimal internal implementation.
-
-**Tasks**:
-- Create `ImmuTable.UUID` module
-- Implement UUIDv7 generation per RFC 9562
-- Use millisecond timestamp + random bits
-- Ensure monotonicity within same millisecond (counter or random)
-- Implement binary and string formatting
-- Remove `uuidv7` hex dependency
-
-**Tests**:
-- Generated UUIDs are valid v7 format
-- UUIDs are time-sortable
-- UUIDs generated in same millisecond maintain ordering or uniqueness
-- Uniqueness under concurrent generation
-- Binary and string formats correct
-
-**Files**:
-- `lib/immu_table_ex/uuid.ex`
-- `test/immu_table_ex/uuid_test.exs`
-- `mix.exs` (remove dependency)
+- `lib/immu_table/migration.ex`
+- `test/immu_table/migration_test.exs`
 
 ---
 
@@ -710,8 +683,8 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 
 ```
 lib/
-  immu_table_ex.ex              # Main module, public API
-  immu_table_ex/
+  immu_table.ex              # Main module, public API
+  immu_table/
     application.ex              # Supervisor
     schema.ex                   # use macro, immutable_schema
     operations.ex               # insert, update, delete, undelete
@@ -721,10 +694,9 @@ lib/
     associations.ex             # immutable_belongs_to, preload helpers
     migration.ex                # Migration helpers
     exceptions.ex               # ImmutableViolationError
-    uuid.ex                     # UUIDv7 implementation (Phase 11)
 
 test/
-  immu_table_ex/
+  immu_table/
     schema_test.exs
     operations_test.exs
     query_test.exs
@@ -753,7 +725,6 @@ priv/
 
 ### Development/Test
 - `postgrex` ~> 0.17
-- `uuidv7` ~> 0.2 (until Phase 11)
 
 ---
 
