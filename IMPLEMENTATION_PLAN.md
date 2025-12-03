@@ -14,7 +14,7 @@
 | Phase 6: Undelete Operations | ✅ Complete | Restoration from tombstone, optional changes, delete/undelete cycles |
 | Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted |
 | Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks direct Repo operations via prepare_changes |
-| Phase 9: Association Support | ⏳ Pending | - |
+| Phase 9: Association Support | ✅ Complete | immutable_belongs_to, preload, join helpers |
 | Phase 10: Migration Helpers | ⏳ Pending | - |
 | Phase 11: Custom UUIDv7 Implementation | ⏳ Pending | - |
 
@@ -222,6 +222,40 @@ User |> ImmuTable.Query.include_deleted() |> Repo.all()
 - Schemas with custom changesets call `maybe_block_updates/2` and `maybe_block_deletes/2` explicitly
 - Conditional compilation: only inject default changeset if not already defined
 - Error messages include schema name and suggest using `ImmuTable.update/3` or `ImmuTable.delete/2`
+
+---
+
+### Phase 9 Completion Details
+
+**Completed**: 2025-12-02
+
+✅ Implemented `immutable_belongs_to/3` macro for defining associations
+✅ Created `{field}_entity_id` fields instead of standard `{field}_id`
+✅ Implemented `ImmuTable.preload/3` to load current versions of associations
+✅ Handles single struct and list of structs for preloading
+✅ Preload resolves to current version after associated entity updates
+✅ Preload returns nil for deleted associations
+✅ Implemented `ImmuTable.join/2` for joining with current association versions
+✅ Join excludes deleted associations automatically
+✅ Registered `:immutable_associations` as accumulate attribute
+✅ Created `__associations__/0` function for runtime access to association metadata
+
+**Files Implemented**:
+- `lib/immu_table/associations.ex` - Association macro and helpers
+- `lib/immu_table.ex` - Added preload and join delegations, registered associations attribute
+- `lib/immu_table/schema.ex` - Added `__associations__/0` function injection
+- `test/immu_table/associations_test.exs` - 13 comprehensive association tests
+- `priv/test_repo/migrations/20251202000004_create_association_test_tables.exs` - Test tables for associations
+
+**Test Results**: 142/142 tests passing (129 existing + 13 association tests)
+
+**Implementation Notes**:
+- Associations reference `entity_id` instead of `id` for version-stable relationships
+- Preload uses `ImmuTable.Query.current()` to resolve to latest non-deleted version
+- Join creates inner join with current subquery and excludes deleted associations
+- Association metadata stored at compile time via `@immutable_associations` attribute
+- Runtime access via `__associations__/0` function returns map of `%{name => {module, opts}}`
+- Join bindings require accounting for `current()` subquery binding when using positional references
 
 ---
 

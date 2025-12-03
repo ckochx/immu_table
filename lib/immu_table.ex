@@ -43,6 +43,7 @@ defmodule ImmuTable do
       import ImmuTable.Schema
 
       @immutable_opts unquote(opts)
+      Module.register_attribute(__MODULE__, :immutable_associations, accumulate: true)
       @before_compile ImmuTable.Schema
     end
   end
@@ -94,4 +95,18 @@ defmodule ImmuTable do
   Same as `undelete/2` but raises on errors.
   """
   defdelegate undelete!(repo, struct, changes \\ %{}), to: ImmuTable.Operations
+
+  @doc """
+  Preloads immutable associations, resolving to current versions.
+
+  See `ImmuTable.Associations.preload/3` for details.
+  """
+  defdelegate preload(struct_or_structs, repo, assoc), to: ImmuTable.Associations
+
+  @doc """
+  Joins with the current version of an immutable association.
+
+  See `ImmuTable.Associations.join/2` for details.
+  """
+  defdelegate join(query, assoc), to: ImmuTable.Associations
 end

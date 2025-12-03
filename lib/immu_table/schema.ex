@@ -44,7 +44,12 @@ defmodule ImmuTable.Schema do
   is true) to prevent version forgery. Silent filtering is safer than raising when
   changeset code is copied between schemas.
   """
-  defmacro __before_compile__(_env) do
+  defmacro __before_compile__(env) do
+    associations =
+      Module.get_attribute(env.module, :immutable_associations, [])
+      |> Enum.reverse()
+      |> Enum.into(%{}, fn {name, module, opts} -> {name, {module, opts}} end)
+
     quote do
       def __immutable__(key) do
         opts = @immutable_opts
@@ -54,6 +59,10 @@ defmodule ImmuTable.Schema do
           :allow_deletes -> Keyword.get(opts, :allow_deletes, false)
           :allow_version_write -> Keyword.get(opts, :allow_version_write, false)
         end
+      end
+
+      def __associations__ do
+        unquote(Macro.escape(associations))
       end
 
       def cast(struct_or_changeset, params, allowed_fields) do
