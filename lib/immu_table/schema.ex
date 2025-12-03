@@ -73,7 +73,24 @@ defmodule ImmuTable.Schema do
             List.delete(allowed_fields, :version)
           end
 
-        Ecto.Changeset.cast(struct_or_changeset, params, allowed_fields)
+        struct_or_changeset
+        |> Ecto.Changeset.cast(params, allowed_fields)
+        |> __ensure_immutable_blocking__()
+      end
+
+      @doc false
+      def __ensure_immutable_blocking__(%Ecto.Changeset{} = changeset) do
+        # Only add blocking if not already added (check for marker in private)
+        private = Map.get(changeset, :private, %{})
+
+        if Map.get(private, :immu_table_blocking_added) do
+          changeset
+        else
+          changeset
+          |> ImmuTable.Changeset.put_private(:immu_table_blocking_added, true)
+          |> maybe_block_updates(__MODULE__)
+          |> maybe_block_deletes(__MODULE__)
+        end
       end
 
       def maybe_block_updates(changeset, module) do
@@ -92,15 +109,20 @@ defmodule ImmuTable.Schema do
         end
       end
 
+      # Override Ecto.Changeset.change/1 and change/2 to inject blocking
+      # This ensures blocking is added even for custom changesets that use change/2 directly
+      def change(struct_or_changeset, changes \\ %{}) do
+        struct_or_changeset
+        |> Ecto.Changeset.change(changes)
+        |> __ensure_immutable_blocking__()
+      end
+
       if Module.defines?(__MODULE__, {:changeset, 2}) do
         :ok
       else
         def changeset(struct_or_changeset, params \\ %{}) do
-          changeset = Ecto.Changeset.change(struct_or_changeset, params)
-
-          changeset
-          |> maybe_block_updates(__MODULE__)
-          |> maybe_block_deletes(__MODULE__)
+          struct_or_changeset
+          |> change(params)
         end
       end
     end

@@ -3,6 +3,12 @@ defmodule ImmuTable.Changeset do
 
   import Ecto.Changeset
 
+  @doc false
+  def put_private(%Ecto.Changeset{} = changeset, key, value) do
+    private = Map.get(changeset, :private, %{})
+    Map.put(changeset, :private, Map.put(private, key, value))
+  end
+
   def block_updates(changeset, module) do
     prepare_changes(changeset, fn prepared_changeset ->
       action = prepared_changeset.action

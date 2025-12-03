@@ -281,7 +281,13 @@ defmodule ImmuTable.Operations do
     end
   end
 
+  # Protected fields that cannot be overridden by user changes
+  @protected_fields [:id, :entity_id, :version, :valid_from, :deleted_at]
+
   defp prepare_update_changeset(current, %Ecto.Changeset{} = changeset) do
+    # Filter out any protected fields from user-provided changeset
+    safe_changes = Map.drop(changeset.changes, @protected_fields)
+
     current
     |> Ecto.Changeset.change()
     |> Ecto.Changeset.apply_changes()
@@ -290,10 +296,13 @@ defmodule ImmuTable.Operations do
     |> then(fn attrs ->
       Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
     end)
-    |> Ecto.Changeset.change(changeset.changes)
+    |> Ecto.Changeset.change(safe_changes)
+    # Set protected fields explicitly - these cannot be tampered with
     |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:entity_id, current.entity_id)
     |> Ecto.Changeset.put_change(:version, current.version + 1)
     |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+    |> Ecto.Changeset.put_change(:deleted_at, nil)
     |> then(fn cs ->
       if changeset.valid? do
         cs
@@ -306,18 +315,27 @@ defmodule ImmuTable.Operations do
   end
 
   defp prepare_update_changeset(current, changes) when is_map(changes) do
+    # Normalize keys to atoms and filter out protected fields
+    safe_changes =
+      changes
+      |> normalize_keys()
+      |> Map.drop(@protected_fields)
+
     current
     |> Ecto.Changeset.change()
     |> Ecto.Changeset.apply_changes()
     |> Map.from_struct()
     |> Map.delete(:__meta__)
-    |> Map.merge(changes)
+    |> Map.merge(safe_changes)
     |> then(fn attrs ->
       Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
     end)
+    # Set protected fields explicitly - these cannot be tampered with
     |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:entity_id, current.entity_id)
     |> Ecto.Changeset.put_change(:version, current.version + 1)
     |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+    |> Ecto.Changeset.put_change(:deleted_at, nil)
   end
 
   defp prepare_delete_changeset(current) do
@@ -336,6 +354,9 @@ defmodule ImmuTable.Operations do
   end
 
   defp prepare_undelete_changeset(current, %Ecto.Changeset{} = changeset) do
+    # Filter out any protected fields from user-provided changeset
+    safe_changes = Map.drop(changeset.changes, @protected_fields)
+
     current
     |> Ecto.Changeset.change()
     |> Ecto.Changeset.apply_changes()
@@ -344,8 +365,10 @@ defmodule ImmuTable.Operations do
     |> then(fn attrs ->
       Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
     end)
-    |> Ecto.Changeset.change(changeset.changes)
+    |> Ecto.Changeset.change(safe_changes)
+    # Set protected fields explicitly - these cannot be tampered with
     |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:entity_id, current.entity_id)
     |> Ecto.Changeset.put_change(:version, current.version + 1)
     |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
     |> Ecto.Changeset.put_change(:deleted_at, nil)
@@ -361,18 +384,39 @@ defmodule ImmuTable.Operations do
   end
 
   defp prepare_undelete_changeset(current, changes) when is_map(changes) do
+    # Normalize keys to atoms and filter out protected fields
+    safe_changes =
+      changes
+      |> normalize_keys()
+      |> Map.drop(@protected_fields)
+
     current
     |> Ecto.Changeset.change()
     |> Ecto.Changeset.apply_changes()
     |> Map.from_struct()
     |> Map.delete(:__meta__)
-    |> Map.merge(changes)
+    |> Map.merge(safe_changes)
     |> then(fn attrs ->
       Ecto.Changeset.change(current.__struct__.__struct__(), attrs)
     end)
+    # Set protected fields explicitly - these cannot be tampered with
     |> Ecto.Changeset.put_change(:id, generate_uuid())
+    |> Ecto.Changeset.put_change(:entity_id, current.entity_id)
     |> Ecto.Changeset.put_change(:version, current.version + 1)
     |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
     |> Ecto.Changeset.put_change(:deleted_at, nil)
+  end
+
+  # Normalize string keys to atoms (only for known schema fields)
+  defp normalize_keys(map) do
+    Map.new(map, fn
+      {key, value} when is_binary(key) ->
+        {String.to_existing_atom(key), value}
+
+      {key, value} when is_atom(key) ->
+        {key, value}
+    end)
+  rescue
+    ArgumentError -> map
   end
 end

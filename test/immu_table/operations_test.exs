@@ -526,4 +526,123 @@ defmodule ImmuTable.OperationsTest do
       end
     end
   end
+
+  describe "metadata tampering prevention" do
+    test "update ignores entity_id in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      fake_entity_id = UUIDv7.generate()
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{balance: 200, entity_id: fake_entity_id})
+
+      # entity_id must be preserved from original, not the tampered value
+      assert v2.entity_id == v1.entity_id
+      refute v2.entity_id == fake_entity_id
+    end
+
+    test "update ignores entity_id string key in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      fake_entity_id = UUIDv7.generate()
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{"balance" => 200, "entity_id" => fake_entity_id})
+
+      assert v2.entity_id == v1.entity_id
+      refute v2.entity_id == fake_entity_id
+    end
+
+    test "update ignores deleted_at in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      fake_deleted_at = DateTime.utc_now()
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{balance: 200, deleted_at: fake_deleted_at})
+
+      # deleted_at must be nil for updates, not the tampered value
+      assert v2.deleted_at == nil
+    end
+
+    test "update ignores version in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{balance: 200, version: 999})
+
+      # version must be current + 1, not the tampered value
+      assert v2.version == 2
+    end
+
+    test "update ignores entity_id in changeset" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      fake_entity_id = UUIDv7.generate()
+
+      changeset =
+        %Account{}
+        |> Ecto.Changeset.change(%{balance: Decimal.new(200)})
+        |> Ecto.Changeset.put_change(:entity_id, fake_entity_id)
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, changeset)
+
+      assert v2.entity_id == v1.entity_id
+      refute v2.entity_id == fake_entity_id
+    end
+
+    test "update ignores deleted_at in changeset" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      fake_deleted_at = DateTime.utc_now()
+
+      changeset =
+        %Account{}
+        |> Ecto.Changeset.change(%{balance: Decimal.new(200)})
+        |> Ecto.Changeset.put_change(:deleted_at, fake_deleted_at)
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, changeset)
+
+      assert v2.deleted_at == nil
+    end
+
+    test "undelete ignores entity_id in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTable.delete(TestRepo, v1)
+      fake_entity_id = UUIDv7.generate()
+
+      {:ok, restored} = ImmuTable.undelete(TestRepo, tombstone, %{entity_id: fake_entity_id})
+
+      assert restored.entity_id == v1.entity_id
+      refute restored.entity_id == fake_entity_id
+    end
+
+    test "undelete ignores deleted_at in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTable.delete(TestRepo, v1)
+      fake_deleted_at = DateTime.utc_now()
+
+      {:ok, restored} = ImmuTable.undelete(TestRepo, tombstone, %{deleted_at: fake_deleted_at})
+
+      # deleted_at must be nil for undelete, not the tampered value
+      assert restored.deleted_at == nil
+    end
+
+    test "undelete ignores version in map changes" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTable.delete(TestRepo, v1)
+
+      {:ok, restored} = ImmuTable.undelete(TestRepo, tombstone, %{version: 999})
+
+      # version must be current + 1, not the tampered value
+      assert restored.version == 3
+    end
+
+    test "undelete ignores entity_id in changeset" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTable.delete(TestRepo, v1)
+      fake_entity_id = UUIDv7.generate()
+
+      changeset =
+        %Account{}
+        |> Ecto.Changeset.change(%{balance: Decimal.new(200)})
+        |> Ecto.Changeset.put_change(:entity_id, fake_entity_id)
+
+      {:ok, restored} = ImmuTable.undelete(TestRepo, tombstone, changeset)
+
+      assert restored.entity_id == v1.entity_id
+      refute restored.entity_id == fake_entity_id
+    end
+  end
 end

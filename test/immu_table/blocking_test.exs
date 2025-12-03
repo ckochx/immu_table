@@ -74,6 +74,121 @@ defmodule ImmuTable.BlockingTest do
     end
   end
 
+  describe "blocking with custom changeset using module's cast/change functions" do
+    defmodule SafeCustomSchema do
+      @moduledoc """
+      A schema with a custom changeset that uses the module's cast function
+      (which includes blocking automatically).
+      """
+      use Ecto.Schema
+      use ImmuTable
+
+      immutable_schema "unsafe_schemas" do
+        field(:value, :string)
+      end
+
+      # Custom changeset that uses the module's cast (not Ecto.Changeset.cast directly)
+      # This gets blocking automatically
+      def changeset(struct, params \\ %{}) do
+        struct
+        |> cast(params, [:value])
+      end
+    end
+
+    defmodule SafeCustomSchemaWithChange do
+      @moduledoc """
+      A schema with a custom changeset that uses the module's change function
+      (which includes blocking automatically).
+      """
+      use Ecto.Schema
+      use ImmuTable
+
+      immutable_schema "unsafe_schemas" do
+        field(:value, :string)
+      end
+
+      # Custom changeset that uses the module's change function
+      def changeset(struct, params \\ %{}) do
+        struct
+        |> change(params)
+      end
+    end
+
+    test "blocks Repo.update when using module's cast function" do
+      {:ok, record} = ImmuTable.insert(TestRepo, %SafeCustomSchema{value: "test"})
+
+      changeset = SafeCustomSchema.changeset(record, %{value: "updated"})
+
+      assert_raise ImmuTable.ImmutableViolationError, fn ->
+        TestRepo.update(changeset)
+      end
+    end
+
+    test "blocks Repo.delete when using module's cast function" do
+      {:ok, record} = ImmuTable.insert(TestRepo, %SafeCustomSchema{value: "test"})
+
+      changeset = SafeCustomSchema.changeset(record)
+
+      assert_raise ImmuTable.ImmutableViolationError, fn ->
+        TestRepo.delete(changeset)
+      end
+    end
+
+    test "blocks Repo.update when using module's change function" do
+      {:ok, record} = ImmuTable.insert(TestRepo, %SafeCustomSchemaWithChange{value: "test"})
+
+      changeset = SafeCustomSchemaWithChange.changeset(record, %{value: "updated"})
+
+      assert_raise ImmuTable.ImmutableViolationError, fn ->
+        TestRepo.update(changeset)
+      end
+    end
+
+    test "blocks Repo.delete when using module's change function" do
+      {:ok, record} = ImmuTable.insert(TestRepo, %SafeCustomSchemaWithChange{value: "test"})
+
+      changeset = SafeCustomSchemaWithChange.changeset(record)
+
+      assert_raise ImmuTable.ImmutableViolationError, fn ->
+        TestRepo.delete(changeset)
+      end
+    end
+  end
+
+  describe "known limitation: Ecto.Changeset.cast bypasses blocking" do
+    defmodule UnsafeSchema do
+      @moduledoc """
+      A schema with a custom changeset that uses Ecto.Changeset.cast directly
+      instead of the module's cast. This bypasses blocking - this is a known limitation.
+
+      Users MUST use the module's cast/3 or change/2 functions to get blocking.
+      """
+      use Ecto.Schema
+      use ImmuTable
+
+      immutable_schema "unsafe_schemas" do
+        field(:value, :string)
+      end
+
+      # UNSAFE: Uses Ecto.Changeset.cast directly - bypasses blocking!
+      def changeset(struct, params \\ %{}) do
+        struct
+        |> Ecto.Changeset.cast(params, [:value])
+      end
+    end
+
+    @tag :known_limitation
+    test "Ecto.Changeset.cast bypasses blocking (known limitation)" do
+      {:ok, record} = ImmuTable.insert(TestRepo, %UnsafeSchema{value: "test"})
+
+      changeset = UnsafeSchema.changeset(record, %{value: "updated"})
+
+      # This does NOT raise because Ecto.Changeset.cast was used directly
+      # This is a known limitation - users must use the module's cast function
+      assert {:ok, _} = TestRepo.update(changeset)
+    end
+  end
+
   describe "mixed allow_updates and allow_deletes settings" do
     defmodule UpdateOnly do
       use Ecto.Schema

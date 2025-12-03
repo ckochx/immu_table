@@ -2,20 +2,195 @@
 
 ## Status
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-03
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: Project Setup | ✅ Complete | All dependencies installed, project compiles without warnings |
 | Phase 2: Schema Macro & Field Injection | ✅ Complete | All fields injected, changeset filtering working, options stored |
 | Phase 3: Insert Operations | ✅ Complete | Insert generates UUIDs, version 1, timestamps |
-| Phase 4: Update Operations | ✅ Complete | Version increment, advisory locks, concurrent safety |
+| Phase 4: Update Operations | ✅ Fixed | Protected fields sanitized, tampering prevented |
 | Phase 5: Delete Operations | ✅ Complete | Tombstone creation, field copying, error handling |
-| Phase 6: Undelete Operations | ✅ Complete | Restoration from tombstone, optional changes, delete/undelete cycles |
+| Phase 6: Undelete Operations | ✅ Fixed | Protected fields sanitized, tampering prevented |
 | Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted |
-| Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks direct Repo operations via prepare_changes |
-| Phase 9: Association Support | ✅ Complete | immutable_belongs_to, preload, join helpers |
-| Phase 10: Migration Helpers | ✅ Complete | create_immutable_table, add_immutable_columns macros |
+| Phase 8: Blocking Repo.update/delete | ✅ Fixed | Blocks via module's cast/change functions (see known limitation) |
+| Phase 9: Association Support | ⚠️ Incomplete | Basic functionality works, but O(N²), no Ecto integration |
+| Phase 10: Migration Helpers | ⚠️ Untested | Macros exist but no integration tests verify SQL output |
+
+---
+
+## Fixes Applied (2025-12-03)
+
+### Fix 1: Elixir Version Constraint ✅
+
+Changed `elixir: "~> 1.19"` to `elixir: "~> 1.14"` in `mix.exs`.
+
+### Fix 2: Metadata Tampering Prevention ✅
+
+**Location**: `lib/immu_table/operations.ex`
+
+Protected fields (`id`, `entity_id`, `version`, `valid_from`, `deleted_at`) are now:
+1. Filtered from user-provided changes before merging
+2. Explicitly set to correct values after merging
+
+```elixir
+@protected_fields [:id, :entity_id, :version, :valid_from, :deleted_at]
+
+defp prepare_update_changeset(current, changes) when is_map(changes) do
+  safe_changes =
+    changes
+    |> normalize_keys()
+    |> Map.drop(@protected_fields)
+
+  # ... merge safe_changes ...
+  # Then explicitly set protected fields:
+  |> Ecto.Changeset.put_change(:id, generate_uuid())
+  |> Ecto.Changeset.put_change(:entity_id, current.entity_id)  # Preserved!
+  |> Ecto.Changeset.put_change(:version, current.version + 1)
+  |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
+  |> Ecto.Changeset.put_change(:deleted_at, nil)  # Always nil for updates!
+end
+```
+
+**Tests Added**: 10 new tests in `test/immu_table/operations_test.exs` verify tampering is prevented.
+
+### Fix 3: Blocking for Custom Changesets ✅
+
+**Location**: `lib/immu_table/schema.ex`
+
+The module's `cast/3` and `change/2` functions now automatically inject blocking via `__ensure_immutable_blocking__/1`. This means:
+
+- Schemas using the module's `cast/3` get blocking automatically
+- Schemas using the module's `change/2` get blocking automatically
+- Developers don't need to call `maybe_block_updates/maybe_block_deletes` manually
+
+**Tests Added**: 4 new tests verify blocking works with custom changesets.
+
+---
+
+## Known Limitation: Direct Ecto.Changeset Usage
+
+If a developer uses `Ecto.Changeset.cast` or `Ecto.Changeset.change` directly instead of the module's functions, blocking is bypassed. This is documented in tests and is a known limitation.
+
+**Workaround**: Always use the module's `cast/3` or `change/2` functions in custom changesets:
+
+```elixir
+# CORRECT - uses module's cast, gets blocking automatically
+def changeset(struct, params) do
+  struct
+  |> cast(params, [:name, :email])  # Module's cast
+  |> validate_required([:name])
+end
+
+# INCORRECT - bypasses blocking!
+def changeset(struct, params) do
+  struct
+  |> Ecto.Changeset.cast(params, [:name, :email])  # Direct Ecto call
+  |> validate_required([:name])
+end
+```
+
+---
+
+## Remaining Issues
+
+### Issue 3: Association Support Is Incomplete [MEDIUM]
+
+**Location**: `lib/immu_table/associations.ex`
+
+**Problems**:
+1. `immutable_belongs_to/3` only creates a field, not an actual Ecto association
+   - `Repo.preload/2` doesn't work (Ecto doesn't know about the association)
+   - `cast_assoc/3` doesn't work
+   - `Ecto.assoc/2` doesn't work
+   - No foreign key constraints
+
+2. `ImmuTable.preload/3` is O(N²) - runs a separate query per parent record
+   ```elixir
+   def preload(struct_or_structs, repo, assoc) when is_list(struct_or_structs) do
+     Enum.map(struct_or_structs, fn struct ->
+       preload(struct, repo, assoc)  # <-- N queries for N parents!
+     end)
+   end
+   ```
+
+**Fix Required**:
+1. Consider using actual `belongs_to` with custom foreign_key pointing to `*_entity_id`
+2. Batch preload: collect all entity_ids, run single query, then match results
+3. Document limitations clearly if full Ecto integration not implemented
+
+---
+
+### Issue 4: Migration Tests Don't Verify SQL Output [MEDIUM]
+
+**Location**: `test/immu_table/migration_test.exs`
+
+**Problem**: Tests only verify that macros are exported and have documentation. No tests verify:
+- Correct SQL is generated
+- Indexes are actually created
+- Column types are correct
+
+**Fix Required**:
+1. Add integration tests that run migrations and verify table structure
+2. Or: Test the expanded AST to verify correct Ecto.Migration calls
+
+---
+
+## Other Issues
+
+### Issue 5: Missing has_many/has_one Inverse Associations [MEDIUM]
+
+Only `immutable_belongs_to` exists. No way to define the inverse side.
+
+---
+
+### Issue 7: No Batch Operations [LOW]
+
+No `insert_all`, `update_all` equivalents for bulk versioned inserts.
+
+---
+
+### Issue 8: No Ecto.Multi Integration [LOW]
+
+No documented way to use ImmuTable operations within `Ecto.Multi`.
+
+---
+
+### Issue 9: Hardcoded Timestamp Source [LOW]
+
+`DateTime.utc_now()` is hardcoded. No way to use database time or custom clock for testing.
+
+---
+
+### Issue 10: Missing Typespecs [LOW]
+
+No `@spec` annotations on public API functions.
+
+---
+
+### Issue 11: Minimal README [LOW]
+
+README lacks usage examples, migration setup guide, query helper examples.
+
+---
+
+## Test Coverage Gaps
+
+| Area | Gap |
+|------|-----|
+| ~~Metadata tampering~~ | ✅ Fixed - 10 tests added |
+| ~~Custom changeset blocking~~ | ✅ Fixed - 4 tests added |
+| Migration SQL | No integration tests verify actual table/index creation |
+| Association edge cases | No tests for invalid association names, bulk preload efficiency |
+| `at_time` boundaries | No tests for exact boundary conditions |
+
+---
+
+## Recommended Next Steps
+
+1. **Optimize preload** to batch queries (O(N²) → O(1))
+2. **Add migration integration tests**
+3. **Add typespecs and improve documentation**
 
 ### Phase 1 Completion Details
 

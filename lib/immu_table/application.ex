@@ -7,17 +7,16 @@ defmodule ImmuTable.Application do
 
   @impl true
   def start(_type, _args) do
-    children = children(Mix.env())
+    # Don't start any children when used as a dependency.
+    # The test repo is only available when running immu_table's own tests.
+    children =
+      if Code.ensure_loaded?(ImmuTable.TestRepo) do
+        [ImmuTable.TestRepo]
+      else
+        []
+      end
 
     opts = [strategy: :one_for_one, name: ImmuTable.Supervisor]
     Supervisor.start_link(children, opts)
-  end
-
-  defp children(:test) do
-    [ImmuTable.TestRepo]
-  end
-
-  defp children(_env) do
-    []
   end
 end
