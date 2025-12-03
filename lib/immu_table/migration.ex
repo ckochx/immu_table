@@ -53,6 +53,7 @@ defmodule ImmuTable.Migration do
   2. Set `version` to 1 for all existing rows
   3. Set `valid_from` to the current timestamp or creation date
   4. Leave `deleted_at` as NULL
+  5. Add indexes using `add_immutable_indexes/1`
 
   ## Example
 
@@ -60,9 +61,7 @@ defmodule ImmuTable.Migration do
         add_immutable_columns()
       end
 
-      create index(:users, [:entity_id])
-      create index(:users, [:entity_id, :version])
-      create index(:users, [:valid_from])
+      add_immutable_indexes(:users)
   """
   defmacro add_immutable_columns do
     quote do
@@ -70,6 +69,33 @@ defmodule ImmuTable.Migration do
       add(:version, :integer, null: false)
       add(:valid_from, :utc_datetime_usec, null: false)
       add(:deleted_at, :utc_datetime_usec)
+    end
+  end
+
+  @doc """
+  Creates recommended indexes for immutable tables.
+
+  Use this after adding immutable columns to an existing table, or
+  to add indexes to a table that was created without them.
+
+  Creates three indexes:
+  - `entity_id` - for finding all versions of an entity
+  - `(entity_id, version)` - composite index for efficient current lookups
+  - `valid_from` - for temporal queries (at_time/2)
+
+  ## Example
+
+      alter table(:users) do
+        add_immutable_columns()
+      end
+
+      add_immutable_indexes(:users)
+  """
+  defmacro add_immutable_indexes(table_name) do
+    quote do
+      create(index(unquote(table_name), [:entity_id]))
+      create(index(unquote(table_name), [:entity_id, :version]))
+      create(index(unquote(table_name), [:valid_from]))
     end
   end
 end

@@ -19,9 +19,48 @@ defmodule ImmuTable.Associations do
   end
 
   def preload(struct_or_structs, repo, assoc) when is_list(struct_or_structs) do
-    Enum.map(struct_or_structs, fn struct ->
-      preload(struct, repo, assoc)
-    end)
+    if struct_or_structs == [] do
+      []
+    else
+      # Extract common data from first struct
+      [first | _] = struct_or_structs
+      module = first.__struct__
+      entity_id_field = :"#{assoc}_entity_id"
+      assoc_module = get_association_module(module, assoc)
+
+      # Collect all entity_ids from the list
+      entity_ids =
+        struct_or_structs
+        |> Enum.map(&Map.get(&1, entity_id_field))
+        |> Enum.reject(&is_nil/1)
+        |> Enum.uniq()
+
+      # Batch query: get all current versions in one query
+      import Ecto.Query
+
+      assoc_records =
+        if entity_ids == [] do
+          []
+        else
+          assoc_module
+          |> ImmuTable.Query.current()
+          |> where([a], a.entity_id in ^entity_ids)
+          |> repo.all()
+        end
+
+      # Build a map of entity_id -> record for fast lookup
+      assoc_map =
+        assoc_records
+        |> Enum.map(&{&1.entity_id, &1})
+        |> Map.new()
+
+      # Map each struct to its preloaded version
+      Enum.map(struct_or_structs, fn struct ->
+        entity_id = Map.get(struct, entity_id_field)
+        assoc_record = if entity_id, do: Map.get(assoc_map, entity_id), else: nil
+        Map.put(struct, assoc, assoc_record)
+      end)
+    end
   end
 
   def preload(struct, repo, assoc) when is_atom(assoc) do
