@@ -109,6 +109,54 @@ defmodule ImmuTable.Query do
     subquery_latest_versions(queryable)
   end
 
+  @doc """
+  Fetches the current version of a specific entity by entity_id.
+
+  Returns a tuple indicating whether the entity exists and its deletion status:
+  - `{:ok, record}` - Entity exists and is not deleted
+  - `{:error, :deleted}` - Entity exists but is deleted (tombstoned)
+  - `{:error, :not_found}` - Entity does not exist
+
+  This is useful when you need to distinguish between "entity doesn't exist"
+  and "entity exists but is deleted", which `current/1` cannot do since it
+  filters out deleted entities.
+
+  ## Examples
+
+      case ImmuTable.Query.get_current(User, repo, user_entity_id) do
+        {:ok, user} ->
+          # User exists and is active
+          IO.puts("User: \#{user.name}")
+
+        {:error, :deleted} ->
+          # User existed but was deleted
+          IO.puts("User was deleted")
+
+        {:error, :not_found} ->
+          # User never existed
+          IO.puts("User not found")
+      end
+  """
+  def get_current(queryable, repo, entity_id) do
+    latest_version =
+      queryable
+      |> where([u], u.entity_id == ^entity_id)
+      |> order_by([u], desc: u.version)
+      |> limit(1)
+      |> repo.one()
+
+    case latest_version do
+      nil ->
+        {:error, :not_found}
+
+      %{deleted_at: nil} = record ->
+        {:ok, record}
+
+      %{deleted_at: _deleted_at} ->
+        {:error, :deleted}
+    end
+  end
+
   # Private helper to get the latest version of each entity
   defp subquery_latest_versions(queryable) do
     from(u in queryable,

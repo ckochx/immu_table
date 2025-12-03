@@ -41,6 +41,7 @@ defmodule ImmuTable do
   defmacro __using__(opts) do
     quote do
       import ImmuTable.Schema
+      import ImmuTable.Associations
 
       @immutable_opts unquote(opts)
       Module.register_attribute(__MODULE__, :immutable_associations, accumulate: true)
@@ -109,4 +110,12 @@ defmodule ImmuTable do
   See `ImmuTable.Associations.join/2` for details.
   """
   defdelegate join(query, assoc), to: ImmuTable.Associations
+
+  @doc """
+  Fetches the current version of an entity by entity_id.
+
+  Returns `{:ok, record}`, `{:error, :deleted}`, or `{:error, :not_found}`.
+  See `ImmuTable.Query.get_current/3` for details.
+  """
+  defdelegate get_current(queryable, repo, entity_id), to: ImmuTable.Query
 end

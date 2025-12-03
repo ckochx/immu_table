@@ -20,7 +20,8 @@ defmodule ImmuTable.MixProject do
   defp aliases do
     [
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      check: ["format", "compile --force --warnings-as-errors"]
+      check: ["format", "compile --force --warnings-as-errors"],
+      "ecto.reset": ["ecto.drop", "ecto.create", "ecto.migrate"]
     ]
   end
 

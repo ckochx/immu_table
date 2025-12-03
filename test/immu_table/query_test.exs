@@ -399,4 +399,96 @@ defmodule ImmuTable.QueryTest do
       assert hd(results).name == "Xander"
     end
   end
+
+  describe "get_current/3" do
+    test "returns {:ok, record} for existing non-deleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "zara@test.com", name: "Zara", status: "active"})
+        )
+
+      {:ok, _v2} = ImmuTable.update(TestRepo, v1, %{name: "Zara Updated"})
+
+      assert {:ok, result} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+      assert result.name == "Zara Updated"
+      assert result.version == 2
+      assert result.deleted_at == nil
+    end
+
+    test "returns {:error, :deleted} for deleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "adam@test.com", name: "Adam", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
+
+      assert {:error, :deleted} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+    end
+
+    test "returns {:error, :not_found} for non-existent entity" do
+      fake_entity_id = UUIDv7.generate()
+
+      assert {:error, :not_found} = ImmuTable.Query.get_current(User, TestRepo, fake_entity_id)
+    end
+
+    test "returns {:ok, record} for undeleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "beth@test.com", name: "Beth", status: "active"})
+        )
+
+      {:ok, v2} = ImmuTable.delete(TestRepo, v1)
+      {:ok, _v3} = ImmuTable.undelete(TestRepo, v2, %{name: "Beth Restored"})
+
+      assert {:ok, result} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+      assert result.name == "Beth Restored"
+      assert result.version == 3
+      assert result.deleted_at == nil
+    end
+
+    test "distinguishes between not_found and deleted" do
+      # Create and delete an entity
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "carl@test.com", name: "Carl", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
+
+      # Create a completely different entity that's active
+      {:ok, v2} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "dana@test.com", name: "Dana", status: "active"})
+        )
+
+      # Deleted entity returns :deleted
+      assert {:error, :deleted} = ImmuTable.Query.get_current(User, TestRepo, v1.entity_id)
+
+      # Active entity returns :ok
+      assert {:ok, result} = ImmuTable.Query.get_current(User, TestRepo, v2.entity_id)
+      assert result.name == "Dana"
+
+      # Non-existent entity returns :not_found
+      fake_id = UUIDv7.generate()
+      assert {:error, :not_found} = ImmuTable.Query.get_current(User, TestRepo, fake_id)
+    end
+
+    test "works via top-level ImmuTable module delegation" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "ella@test.com", name: "Ella", status: "active"})
+        )
+
+      # Should work via ImmuTable.get_current (delegated)
+      assert {:ok, result} = ImmuTable.get_current(User, TestRepo, v1.entity_id)
+      assert result.name == "Ella"
+    end
+  end
 end
