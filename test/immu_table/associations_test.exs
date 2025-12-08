@@ -495,4 +495,168 @@ defmodule ImmuTable.AssociationsTest do
       assert Enum.at(loaded_projects, 1).lead_developer.name == "Bob"
     end
   end
+
+  describe "join/2 with has_many associations" do
+    test "joins parent with current children" do
+      {:ok, org} = ImmuTable.insert(TestRepo, %Organization{name: "Acme Corp"})
+
+      {:ok, _p1} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Alpha",
+          organization_entity_id: org.entity_id
+        })
+
+      {:ok, _p2} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Beta",
+          organization_entity_id: org.entity_id
+        })
+
+      import Ecto.Query
+
+      results =
+        Organization
+        |> ImmuTable.Query.get_current()
+        |> ImmuTable.join(:projects)
+        |> select([o, _o_current, p], {o.name, p.title})
+        |> TestRepo.all()
+
+      assert length(results) == 2
+      assert {"Acme Corp", "Project Alpha"} in results
+      assert {"Acme Corp", "Project Beta"} in results
+    end
+
+    test "join excludes deleted children" do
+      {:ok, org} = ImmuTable.insert(TestRepo, %Organization{name: "Acme Corp"})
+
+      {:ok, p1} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Alpha",
+          organization_entity_id: org.entity_id
+        })
+
+      {:ok, _p2} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Beta",
+          organization_entity_id: org.entity_id
+        })
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, p1)
+
+      import Ecto.Query
+
+      results =
+        Organization
+        |> ImmuTable.Query.get_current()
+        |> ImmuTable.join(:projects)
+        |> select([o, _o_current, p], {o.name, p.title})
+        |> TestRepo.all()
+
+      assert results == [{"Acme Corp", "Project Beta"}]
+    end
+
+    test "join returns only current version of children" do
+      {:ok, org} = ImmuTable.insert(TestRepo, %Organization{name: "Acme Corp"})
+
+      {:ok, project} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Alpha",
+          organization_entity_id: org.entity_id
+        })
+
+      {:ok, _project_v2} = ImmuTable.update(TestRepo, project, %{title: "Project Alpha Updated"})
+
+      import Ecto.Query
+
+      results =
+        Organization
+        |> ImmuTable.Query.get_current()
+        |> ImmuTable.join(:projects)
+        |> select([o, _o_current, p], {o.name, p.title})
+        |> TestRepo.all()
+
+      assert results == [{"Acme Corp", "Project Alpha Updated"}]
+    end
+  end
+
+  describe "join/2 with has_one associations" do
+    test "joins parent with current child" do
+      {:ok, project} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Alpha",
+          organization_entity_id: nil
+        })
+
+      {:ok, _dev} =
+        ImmuTable.insert(TestRepo, %Developer{
+          name: "Alice",
+          project_entity_id: project.entity_id
+        })
+
+      import Ecto.Query
+
+      results =
+        Project
+        |> ImmuTable.Query.get_current()
+        |> ImmuTable.join(:lead_developer)
+        |> select([p, _p_current, dev], {p.title, dev.name})
+        |> TestRepo.all()
+
+      assert results == [{"Project Alpha", "Alice"}]
+    end
+
+    test "join excludes deleted child" do
+      {:ok, project} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Alpha",
+          organization_entity_id: nil
+        })
+
+      {:ok, dev} =
+        ImmuTable.insert(TestRepo, %Developer{
+          name: "Alice",
+          project_entity_id: project.entity_id
+        })
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, dev)
+
+      import Ecto.Query
+
+      results =
+        Project
+        |> ImmuTable.Query.get_current()
+        |> ImmuTable.join(:lead_developer)
+        |> select([p, _p_current, dev], {p.title, dev.name})
+        |> TestRepo.all()
+
+      assert results == []
+    end
+
+    test "join returns only current version of child" do
+      {:ok, project} =
+        ImmuTable.insert(TestRepo, %Project{
+          title: "Project Alpha",
+          organization_entity_id: nil
+        })
+
+      {:ok, dev} =
+        ImmuTable.insert(TestRepo, %Developer{
+          name: "Alice",
+          project_entity_id: project.entity_id
+        })
+
+      {:ok, _dev_v2} = ImmuTable.update(TestRepo, dev, %{name: "Alice Updated"})
+
+      import Ecto.Query
+
+      results =
+        Project
+        |> ImmuTable.Query.get_current()
+        |> ImmuTable.join(:lead_developer)
+        |> select([p, _p_current, dev], {p.title, dev.name})
+        |> TestRepo.all()
+
+      assert results == [{"Project Alpha", "Alice Updated"}]
+    end
+  end
 end

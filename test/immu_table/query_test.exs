@@ -280,6 +280,122 @@ defmodule ImmuTable.QueryTest do
       assert Enum.at(results, 0).name == "Paula"
       assert Enum.at(results, 1).name == "Quinn"
     end
+
+    test "boundary case: timestamp exactly equal to valid_from" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "boundary@test.com", name: "Boundary", status: "active"})
+        )
+
+      # Query at the exact moment the entity was created
+      results = User |> ImmuTable.Query.at_time(v1.valid_from) |> TestRepo.all()
+
+      assert length(results) == 1
+      assert hd(results).version == 1
+      assert hd(results).name == "Boundary"
+    end
+
+    test "boundary case: timestamp one microsecond before valid_from" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "before@test.com", name: "Before", status: "active"})
+        )
+
+      # Query one microsecond before the entity was created
+      one_micro_before = DateTime.add(v1.valid_from, -1, :microsecond)
+      results = User |> ImmuTable.Query.at_time(one_micro_before) |> TestRepo.all()
+
+      assert results == []
+    end
+
+    test "boundary case: multiple versions with timestamp exactly at transition" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "transition@test.com", name: "V1", status: "active"})
+        )
+
+      Process.sleep(10)
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{name: "V2"})
+
+      Process.sleep(10)
+
+      {:ok, v3} = ImmuTable.update(TestRepo, v2, %{name: "V3"})
+
+      # At v1's exact timestamp
+      results_v1 = User |> ImmuTable.Query.at_time(v1.valid_from) |> TestRepo.all()
+      assert length(results_v1) == 1
+      assert hd(results_v1).version == 1
+      assert hd(results_v1).name == "V1"
+
+      # At v2's exact timestamp
+      results_v2 = User |> ImmuTable.Query.at_time(v2.valid_from) |> TestRepo.all()
+      assert length(results_v2) == 1
+      assert hd(results_v2).version == 2
+      assert hd(results_v2).name == "V2"
+
+      # At v3's exact timestamp
+      results_v3 = User |> ImmuTable.Query.at_time(v3.valid_from) |> TestRepo.all()
+      assert length(results_v3) == 1
+      assert hd(results_v3).version == 3
+      assert hd(results_v3).name == "V3"
+    end
+
+    test "boundary case: timestamp between two versions" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "between@test.com", name: "V1", status: "active"})
+        )
+
+      Process.sleep(10)
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{name: "V2"})
+
+      # Timestamp halfway between v1 and v2
+      halfway = DateTime.add(v1.valid_from, div(DateTime.diff(v2.valid_from, v1.valid_from, :microsecond), 2), :microsecond)
+
+      results = User |> ImmuTable.Query.at_time(halfway) |> TestRepo.all()
+
+      assert length(results) == 1
+      assert hd(results).version == 1
+      assert hd(results).name == "V1"
+    end
+
+    test "boundary case: far future timestamp returns current version" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "future@test.com", name: "Current", status: "active"})
+        )
+
+      {:ok, _v2} = ImmuTable.update(TestRepo, v1, %{name: "Updated"})
+
+      # Query 100 years in the future
+      far_future = DateTime.add(DateTime.utc_now(), 100 * 365, :day)
+      results = User |> ImmuTable.Query.at_time(far_future) |> TestRepo.all()
+
+      assert length(results) == 1
+      assert hd(results).version == 2
+      assert hd(results).name == "Updated"
+    end
+
+    test "boundary case: far past timestamp before any data" do
+      {:ok, _v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "past@test.com", name: "Recent", status: "active"})
+        )
+
+      # Query from 2000-01-01
+      far_past = ~U[2000-01-01 00:00:00Z]
+      results = User |> ImmuTable.Query.at_time(far_past) |> TestRepo.all()
+
+      assert results == []
+    end
   end
 
   describe "all_versions/1" do

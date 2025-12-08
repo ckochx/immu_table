@@ -645,4 +645,74 @@ defmodule ImmuTable.OperationsTest do
       refute restored.entity_id == fake_entity_id
     end
   end
+
+  describe "handling unknown keys in maps" do
+    test "update ignores unknown string keys from controller params" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      # Simulate controller params with extra fields
+      params = %{
+        "balance" => 200,
+        "name" => "Updated",
+        "_csrf_token" => "abc123",
+        "foo" => "bar",
+        "extra_field" => "ignored"
+      }
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, params)
+
+      # Should apply known fields and ignore unknown ones
+      assert v2.balance == 200
+      assert v2.name == "Updated"
+      assert v2.version == 2
+    end
+
+    test "delete works with unknown string keys in metadata" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      # Delete should work even if we tried to pass extra params (they're not used in delete)
+      {:ok, tombstone} = ImmuTable.delete(TestRepo, v1)
+
+      assert tombstone.deleted_at != nil
+      assert tombstone.version == 2
+    end
+
+    test "undelete ignores unknown string keys from controller params" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+      {:ok, tombstone} = ImmuTable.delete(TestRepo, v1)
+
+      # Simulate controller params with extra fields
+      params = %{
+        "balance" => 300,
+        "name" => "Restored",
+        "_csrf_token" => "xyz789",
+        "session_id" => "ignored"
+      }
+
+      {:ok, restored} = ImmuTable.undelete(TestRepo, tombstone, params)
+
+      # Should apply known fields and ignore unknown ones
+      assert restored.balance == 300
+      assert restored.name == "Restored"
+      assert restored.deleted_at == nil
+      assert restored.version == 3
+    end
+
+    test "update with mix of atom and string keys with unknowns" do
+      {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
+
+      # Mix of atom and string keys with unknowns
+      params = %{
+        :balance => 250,
+        "name" => "Mixed Keys",
+        "unknown_field" => "dropped",
+        :random_atom => "also_dropped"
+      }
+
+      {:ok, v2} = ImmuTable.update(TestRepo, v1, params)
+
+      assert v2.balance == 250
+      assert v2.name == "Mixed Keys"
+    end
+  end
 end

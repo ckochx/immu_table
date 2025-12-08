@@ -315,10 +315,12 @@ defmodule ImmuTable.Operations do
   end
 
   defp prepare_update_changeset(current, changes) when is_map(changes) do
+    schema = current.__struct__
+
     # Normalize keys to atoms and filter out protected fields
     safe_changes =
       changes
-      |> normalize_keys()
+      |> normalize_keys(schema)
       |> Map.drop(@protected_fields)
 
     current
@@ -384,10 +386,12 @@ defmodule ImmuTable.Operations do
   end
 
   defp prepare_undelete_changeset(current, changes) when is_map(changes) do
+    schema = current.__struct__
+
     # Normalize keys to atoms and filter out protected fields
     safe_changes =
       changes
-      |> normalize_keys()
+      |> normalize_keys(schema)
       |> Map.drop(@protected_fields)
 
     current
@@ -408,15 +412,29 @@ defmodule ImmuTable.Operations do
   end
 
   # Normalize string keys to atoms (only for known schema fields)
-  defp normalize_keys(map) do
-    Map.new(map, fn
-      {key, value} when is_binary(key) ->
-        {String.to_existing_atom(key), value}
+  # Unknown keys are silently dropped to allow passing controller params
+  defp normalize_keys(map, schema) do
+    valid_fields = MapSet.new(schema.__schema__(:fields))
 
-      {key, value} when is_atom(key) ->
-        {key, value}
+    Enum.reduce(map, %{}, fn
+      {key, value}, acc when is_binary(key) ->
+        try do
+          atom_key = String.to_existing_atom(key)
+          if MapSet.member?(valid_fields, atom_key) do
+            Map.put(acc, atom_key, value)
+          else
+            acc
+          end
+        rescue
+          ArgumentError -> acc
+        end
+
+      {key, value}, acc when is_atom(key) ->
+        if MapSet.member?(valid_fields, key) do
+          Map.put(acc, key, value)
+        else
+          acc
+        end
     end)
-  rescue
-    ArgumentError -> map
   end
 end

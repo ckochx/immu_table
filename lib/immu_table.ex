@@ -25,6 +25,21 @@ defmodule ImmuTable do
       {:ok, v2} = ImmuTable.update(Repo, v1, %{name: "Savings"})
       {:ok, v3} = ImmuTable.delete(Repo, v2)  # tombstone, data preserved
 
+  ## Transaction Support
+
+  Use `ImmuTable.Multi` to compose immutable operations within Ecto.Multi transactions:
+
+      alias ImmuTable.Multi, as: ImmuMulti
+
+      Ecto.Multi.new()
+      |> ImmuMulti.insert(:account, %Account{name: "Savings", balance: 1000})
+      |> ImmuMulti.update(:updated, fn %{account: acc} ->
+        {acc, %{balance: 1500}}
+      end)
+      |> Repo.transaction()
+
+  See `ImmuTable.Multi` for details.
+
   ## Options
 
   - `:allow_updates` - Permit `Repo.update` (default: false, bypasses immutability)

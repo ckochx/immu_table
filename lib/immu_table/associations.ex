@@ -244,18 +244,35 @@ defmodule ImmuTable.Associations do
     import Ecto.Query
 
     schema = get_query_schema(query)
-    entity_id_field = :"#{assoc}_entity_id"
-    assoc_module = get_association_module(schema, assoc)
+    {assoc_module, opts} = get_association_info(schema, assoc)
+    assoc_type = Keyword.get(opts, :type, :belongs_to)
 
     current_assoc_query =
       assoc_module
       |> ImmuTable.Query.get_current()
 
-    from(q in query,
-      join: a in subquery(current_assoc_query),
-      on: field(q, ^entity_id_field) == a.entity_id,
-      as: ^assoc
-    )
+    case assoc_type do
+      :belongs_to ->
+        # Parent has <assoc>_entity_id field pointing to child's entity_id
+        entity_id_field = :"#{assoc}_entity_id"
+
+        from(q in query,
+          join: a in subquery(current_assoc_query),
+          on: field(q, ^entity_id_field) == a.entity_id,
+          as: ^assoc
+        )
+
+      type when type in [:has_many, :has_one] ->
+        # Child has foreign_key field pointing to parent's entity_id
+        foreign_key = Keyword.get(opts, :foreign_key) ||
+          raise ArgumentError, "#{type} associations require :foreign_key option for join/2"
+
+        from(q in query,
+          join: a in subquery(current_assoc_query),
+          on: q.entity_id == field(a, ^foreign_key),
+          as: ^assoc
+        )
+    end
   end
 
   defp get_query_schema(%Ecto.Query{from: %{source: {_table, schema}}}) when schema != nil do
@@ -277,10 +294,5 @@ defmodule ImmuTable.Associations do
       {assoc_module, opts} -> {assoc_module, opts}
       nil -> raise ArgumentError, "association #{assoc_name} not found on #{module}"
     end
-  end
-
-  defp get_association_module(module, assoc_name) do
-    {assoc_module, _opts} = get_association_info(module, assoc_name)
-    assoc_module
   end
 end
