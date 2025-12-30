@@ -2,7 +2,7 @@
 
 ## Status
 
-**Last Updated**: 2025-12-29
+**Last Updated**: 2025-12-30
 
 | Phase | Status | Notes |
 |-------|--------|-------|
@@ -16,11 +16,38 @@
 | Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks via module's cast/change functions (see known limitation) |
 | Phase 9: Association Support | ✅ Complete | Optimized preload from O(N²) to O(1), basic functionality complete |
 | Phase 10: Migration Helpers | ✅ Complete | Macros exist with full integration tests, add_immutable_indexes/1 added |
+| Phase 11: Mix Generators | ✅ Complete | Schema, context, and migration generators with tests |
 | **Demo App** | ✅ Complete | Phoenix LiveView CRUD app demonstrating all features |
 
 ---
 
-## Latest Updates (2025-12-29)
+## Latest Updates (2025-12-30)
+
+### Mix Generators
+
+Added code generators for scaffolding ImmuTable schemas, contexts, and migrations:
+
+```bash
+# Generate a schema with immutable_schema
+$ mix immutable.gen.schema Blog.Post posts title:string body:text
+
+# Generate a migration with create_immutable_table
+$ mix immutable.gen.migration Blog.Post posts title:string body:text
+
+# Generate context + schema (like phx.gen.context)
+$ mix immutable.gen.context Blog Post posts title:string body:text
+```
+
+Features:
+- Generates proper `immutable_schema` with field definitions
+- Creates changesets that use the module's `cast/3` (not `Ecto.Changeset.cast/3`)
+- Migrations use `create_immutable_table` with correct indexes
+- Contexts include all ImmuTable operations (list, get, create, update, delete, undelete, history)
+- References automatically use `entity_id` foreign keys
+
+---
+
+## Previous Updates (2025-12-29)
 
 ### Ergonomic Query Functions
 
@@ -69,17 +96,18 @@ See `demo/GENERATORS.md` for setup instructions.
 
 ### Test Coverage
 
-**235 tests, 0 failures**
+**250 tests, 0 failures**
 
 ---
 
 ## Summary
 
 ### Completed Phases
-All 10 implementation phases are now complete:
+All 11 implementation phases are now complete:
 - ✅ Phase 1-8: Core functionality (insert, update, delete, undelete, queries, blocking)
 - ✅ Phase 9: Association support (belongs_to, has_many, has_one with batch preloading)
 - ✅ Phase 10: Migration helpers (create_immutable_table, add_immutable_indexes)
+- ✅ Phase 11: Mix generators (schema, context, migration)
 - ✅ Demo App: Phoenix LiveView CRUD example
 
 ### Resolved Issues
@@ -93,6 +121,7 @@ All 10 implementation phases are now complete:
 - ✅ README with comprehensive documentation
 - ✅ Hex package configuration (`mix hex.build`)
 - ✅ ExDoc configuration (`mix docs`)
+- ✅ Mix generators (schema, context, migration)
 
 ### Remaining Work (LOW Priority)
 - Typespecs for public API
@@ -101,13 +130,11 @@ All 10 implementation phases are now complete:
 - Hardcoded timestamp source
 - Full Ecto integration for associations (cast_assoc, Repo.preload)
 
-### Future Enhancement (MEDIUM Priority)
-- **Phoenix Generator Hooks**: Create generator tasks that emit ImmuTable-compatible code:
-  - `mix immu.gen.live` - Like `phx.gen.live` but with immutable schema, migration, and context
-  - `mix immu.gen.html` - Like `phx.gen.html` but with ImmuTable setup
-  - `mix immu.gen.context` - Generate context with ImmuTable operations
-  - `mix immu.gen.schema` - Generate schema with `immutable_schema` and proper changeset
+### Future Enhancement (LOW Priority)
+- **LiveView Generator**: `mix immutable.gen.live` - Like `phx.gen.live` but with ImmuTable-aware templates
   - Should handle `entity_id` in routes, LiveView params, and templates
+  - History view component
+  - Tombstone/restore UI
 
 ---
 
@@ -218,6 +245,14 @@ lib/
     associations.ex          # immutable_belongs_to, has_many, has_one, preload
     migration.ex             # Migration helpers
     exceptions.ex            # ImmutableViolationError
+  mix/
+    immutable/
+      generator.ex           # Generator utilities
+      templates.ex           # EEx templates
+    tasks/
+      immutable.gen.schema.ex    # Schema generator
+      immutable.gen.migration.ex # Migration generator
+      immutable.gen.context.ex   # Context generator
 
 demo/                        # Phoenix LiveView demo app
   lib/demo/tasks/            # Example ImmuTable schema
@@ -232,6 +267,10 @@ test/
     blocking_test.exs
     associations_test.exs
     migration_test.exs
+  mix/tasks/
+    immutable.gen.schema_test.exs
+    immutable.gen.migration_test.exs
+    immutable.gen.context_test.exs
   integration/
     user_integration_test.exs
 ```
@@ -251,7 +290,7 @@ use ImmuTable,
 
 ## Success Criteria
 
-1. ✅ All tests pass (235 tests)
+1. ✅ All tests pass (250 tests)
 2. ✅ No modifications to existing rows during update/delete operations
 3. ✅ Correct current row resolution after delete/undelete cycles
 4. ✅ Concurrent operations serialize correctly
