@@ -2,140 +2,74 @@
 
 ## Status
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2025-12-29
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: Project Setup | ✅ Complete | All dependencies installed, project compiles without warnings |
 | Phase 2: Schema Macro & Field Injection | ✅ Complete | All fields injected, changeset filtering working, options stored |
-| Phase 3: Insert Operations | ✅ Complete | Insert generates UUIDs, version 1, timestamps |
-| Phase 4: Update Operations | ✅ Fixed | Protected fields sanitized, tampering prevented |
+| Phase 3: Insert Operations | ✅ Complete | Insert generates UUIDs, version 1, timestamps. Pipe-friendly syntax added. |
+| Phase 4: Update Operations | ✅ Complete | Protected fields sanitized, tampering prevented. Pipe-friendly syntax added. |
 | Phase 5: Delete Operations | ✅ Complete | Tombstone creation, field copying, error handling |
-| Phase 6: Undelete Operations | ✅ Fixed | Protected fields sanitized, tampering prevented |
-| Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted |
-| Phase 8: Blocking Repo.update/delete | ✅ Fixed | Blocks via module's cast/change functions (see known limitation) |
-| Phase 9: Association Support | ✅ Fixed | Optimized preload from O(N²) to O(1), basic functionality complete |
+| Phase 6: Undelete Operations | ✅ Complete | Protected fields sanitized, tampering prevented |
+| Phase 7: Query Helpers | ✅ Complete | current, history, at_time, all_versions, include_deleted, get, get!, fetch_current |
+| Phase 8: Blocking Repo.update/delete | ✅ Complete | Blocks via module's cast/change functions (see known limitation) |
+| Phase 9: Association Support | ✅ Complete | Optimized preload from O(N²) to O(1), basic functionality complete |
 | Phase 10: Migration Helpers | ✅ Complete | Macros exist with full integration tests, add_immutable_indexes/1 added |
+| **Demo App** | ✅ Complete | Phoenix LiveView CRUD app demonstrating all features |
 
 ---
 
----
+## Latest Updates (2025-12-29)
 
-## Latest Fixes Applied (2025-12-03 PM Session 2)
+### Ergonomic Query Functions
 
-### Fix 7: Query Behavior for Deleted Entities ✅
+Added `get/3` and `get!/3` for simpler entity lookup:
 
-**Location**: `lib/immu_table/query.ex:140`, `lib/immu_table.ex:119`
-
-Added `get_current/3` function that returns tuple indicating entity status:
-- `{:ok, record}` - Entity exists and is not deleted
-- `{:error, :deleted}` - Entity exists but is deleted (tombstoned)
-- `{:error, :not_found}` - Entity does not exist
-
-**Implementation**: Uses simple query ordering by version DESC with limit 1, then pattern matches on `deleted_at` field.
-
-**Tests Added**: 6 new tests verify all three return states and delegation.
-
-**Usage Example**:
 ```elixir
-case ImmuTable.get_current(User, TestRepo, entity_id) do
-  {:ok, user} -> {:ok, user}
-  {:error, :deleted} -> {:error, "User was deleted"}
-  {:error, :not_found} -> {:error, "User not found"}
+# Returns struct or nil (mirrors Repo.get/2)
+user = ImmuTable.get(User, Repo, entity_id)
+
+# Returns struct or raises Ecto.NoResultsError
+user = ImmuTable.get!(User, Repo, entity_id)
+
+# For detailed status, use fetch_current/3
+case ImmuTable.fetch_current(User, Repo, entity_id) do
+  {:ok, user} -> user
+  {:error, :deleted} -> handle_deleted()
+  {:error, :not_found} -> handle_not_found()
 end
 ```
 
-### Fix 8: has_many and has_one Associations ✅
+### Pipe-Friendly CRUD Operations
 
-**Location**: `lib/immu_table/associations.ex:21-241`
+Added 2-arity versions supporting reversed argument order:
 
-Added inverse association support:
-- `immutable_has_many/3` macro for one-to-many relationships
-- `immutable_has_one/3` macro for one-to-one relationships
-- Both require `:foreign_key` option to specify child's reference field
-- Batch preloading implemented for O(1) query performance
-
-**Implementation**:
-- Association types tracked via `:type` option in metadata
-- Separate preload functions for each association type
-- `has_many` groups children by parent entity_id
-- `has_one` takes first record per parent (handles multiple gracefully)
-- All associations filter by current versions only
-
-**Tests Added**: 10 new tests covering preload, updates, deletions, and batch operations.
-
-**Usage Example**:
 ```elixir
-defmodule Organization do
-  use ImmuTable
+# Insert - both work
+ImmuTable.insert(Repo, changeset)
+changeset |> ImmuTable.insert(Repo)
 
-  immutable_schema "organizations" do
-    field :name, :string
-    immutable_has_many :projects, Project, foreign_key: :organization_entity_id
-  end
-end
-
-defmodule Project do
-  use ImmuTable
-
-  immutable_schema "projects" do
-    field :title, :string
-    immutable_belongs_to :organization, Organization
-  end
-end
-
-# Preload works seamlessly
-org = ImmuTable.preload(org, Repo, :projects)
-assert length(org.projects) == 5
+# Update from changeset - both work
+ImmuTable.update(Repo, changeset)
+user |> User.changeset(attrs) |> ImmuTable.update(Repo)
 ```
 
----
+### Phoenix LiveView Demo App
 
-## Latest Fixes Applied (2025-12-03 PM Session 1)
+Created `demo/` folder with complete Phoenix LiveView CRUD app:
 
-### Fix 4: Migration Indexes Helper ✅
+- Task management with version tracking
+- History timeline view
+- Soft delete with tombstone view
+- Restore functionality
+- Routes using `entity_id` for stable URLs
 
-**Location**: `lib/immu_table/migration.ex`
+See `demo/GENERATORS.md` for setup instructions.
 
-Added new `add_immutable_indexes/1` macro that creates all required indexes for immutable tables:
-- `entity_id` index for finding all versions
-- `(entity_id, version)` composite index for current lookups
-- `valid_from` index for temporal queries
+### Test Coverage
 
-Updated `add_immutable_columns/0` documentation to reference the new macro.
-
-**Tests Added**: 3 new tests verify the macro is exported and documented.
-
-### Fix 5: Preload Optimization ✅
-
-**Location**: `lib/immu_table/associations.ex`
-
-Optimized `preload/3` function for lists from O(N²) to O(1) in database queries:
-- Old: N separate queries (one per struct)
-- New: 1 batch query using `WHERE entity_id IN (...)`
-
-Implementation uses:
-1. Collect all entity_ids from list
-2. Single batch query for all current versions
-3. Build map for O(1) lookup
-4. Map results back to structs
-
-**Performance**: For 100 records, reduced from 100 database queries to 1.
-
-### Fix 6: Migration Integration Tests ✅
-
-**Location**: `test/immu_table/migration_test.exs`
-
-Added comprehensive integration tests:
-- Verify `create_immutable_table` creates all columns with correct types
-- Verify all indexes are created (entity_id, composite, valid_from)
-- Verify custom columns work in do block
-- Verify `add_immutable_columns` adds columns to existing tables
-- Verify `add_immutable_indexes` creates all indexes
-
-**Tests Added**: 5 new integration tests with real table creation.
-
-**Test Count**: 168 tests total, all passing.
+**235 tests, 0 failures**
 
 ---
 
@@ -146,76 +80,24 @@ All 10 implementation phases are now complete:
 - ✅ Phase 1-8: Core functionality (insert, update, delete, undelete, queries, blocking)
 - ✅ Phase 9: Association support (belongs_to, has_many, has_one with batch preloading)
 - ✅ Phase 10: Migration helpers (create_immutable_table, add_immutable_indexes)
+- ✅ Demo App: Phoenix LiveView CRUD example
 
-### High & Medium Priority Issues Resolved
+### Resolved Issues
 - ✅ Migration index helper
 - ✅ Preload optimization (O(N²) → O(1))
 - ✅ Migration integration tests
-- ✅ Query behavior for deleted entities
+- ✅ Query behavior for deleted entities (fetch_current/3)
+- ✅ Ergonomic get/3 and get!/3 functions
+- ✅ Pipe-friendly insert/2 and update/2
 - ✅ Inverse associations (has_many, has_one)
+- ✅ README with comprehensive documentation
 
-### Test Coverage
-- **184 tests, 0 failures**
-- Comprehensive coverage of all CRUD operations
-- Integration tests for migrations
-- Association preloading in all scenarios
-
-### Remaining Work
-All remaining issues are LOW priority:
+### Remaining Work (LOW Priority)
 - Typespecs for public API
 - Ecto.Multi integration docs
 - Batch operations (insert_all, update_all)
 - Hardcoded timestamp source
-- README improvements
-
----
-
-## Fixes Applied (2025-12-03 AM)
-
-### Fix 1: Elixir Version Constraint ✅
-
-Changed `elixir: "~> 1.19"` to `elixir: "~> 1.14"` in `mix.exs`.
-
-### Fix 2: Metadata Tampering Prevention ✅
-
-**Location**: `lib/immu_table/operations.ex`
-
-Protected fields (`id`, `entity_id`, `version`, `valid_from`, `deleted_at`) are now:
-1. Filtered from user-provided changes before merging
-2. Explicitly set to correct values after merging
-
-```elixir
-@protected_fields [:id, :entity_id, :version, :valid_from, :deleted_at]
-
-defp prepare_update_changeset(current, changes) when is_map(changes) do
-  safe_changes =
-    changes
-    |> normalize_keys()
-    |> Map.drop(@protected_fields)
-
-  # ... merge safe_changes ...
-  # Then explicitly set protected fields:
-  |> Ecto.Changeset.put_change(:id, generate_uuid())
-  |> Ecto.Changeset.put_change(:entity_id, current.entity_id)  # Preserved!
-  |> Ecto.Changeset.put_change(:version, current.version + 1)
-  |> Ecto.Changeset.put_change(:valid_from, DateTime.utc_now())
-  |> Ecto.Changeset.put_change(:deleted_at, nil)  # Always nil for updates!
-end
-```
-
-**Tests Added**: 10 new tests in `test/immu_table/operations_test.exs` verify tampering is prevented.
-
-### Fix 3: Blocking for Custom Changesets ✅
-
-**Location**: `lib/immu_table/schema.ex`
-
-The module's `cast/3` and `change/2` functions now automatically inject blocking via `__ensure_immutable_blocking__/1`. This means:
-
-- Schemas using the module's `cast/3` get blocking automatically
-- Schemas using the module's `change/2` get blocking automatically
-- Developers don't need to call `maybe_block_updates/maybe_block_deletes` manually
-
-**Tests Added**: 4 new tests verify blocking works with custom changesets.
+- Full Ecto integration for associations (cast_assoc, Repo.preload)
 
 ---
 
@@ -243,388 +125,29 @@ end
 
 ---
 
-## Remaining Issues
+## Other Issues (LOW Priority)
 
-### Issue 3: Association Support - Ecto Integration [MEDIUM]
-
-**Location**: `lib/immu_table/associations.ex`
-
-**Status**: ✅ Preload optimized (O(N²) → O(1))
-
-**Remaining Problems**:
-1. `immutable_belongs_to/3` only creates a field, not an actual Ecto association
-   - `Repo.preload/2` doesn't work (Ecto doesn't know about the association)
-   - `cast_assoc/3` doesn't work
-   - `Ecto.assoc/2` doesn't work
-   - No foreign key constraints
-
-**Fix Required**:
-1. Consider using actual `belongs_to` with custom foreign_key pointing to `*_entity_id`
-2. Document limitations clearly if full Ecto integration not implemented
-
----
-
-## Other Issues
-
-### Issue 5: Missing has_many/has_one Inverse Associations [MEDIUM → FIXED]
-
-**Status**: ✅ Fixed - `immutable_has_many/3` and `immutable_has_one/3` added with batch preloading support.
-
----
-
-### Issue 7: No Batch Operations [LOW]
+### Issue 7: No Batch Operations
 
 No `insert_all`, `update_all` equivalents for bulk versioned inserts.
 
----
-
-### Issue 8: No Ecto.Multi Integration [LOW]
+### Issue 8: No Ecto.Multi Integration
 
 No documented way to use ImmuTable operations within `Ecto.Multi`.
 
----
-
-### Issue 9: Hardcoded Timestamp Source [LOW]
+### Issue 9: Hardcoded Timestamp Source
 
 `DateTime.utc_now()` is hardcoded. No way to use database time or custom clock for testing.
 
----
-
-### Issue 10: Missing Typespecs [LOW]
+### Issue 10: Missing Typespecs
 
 No `@spec` annotations on public API functions.
 
----
+### Issue 12: Handle Non-UUID Primary Keys in Migration
 
-### Issue 11: Minimal README [LOW]
-
-README lacks usage examples, migration setup guide, query helper examples.
+`add_immutable_columns/0` assumes the table will use UUID for `id`. Document that ImmuTable requires UUID primary keys.
 
 ---
-
-### Issue 12: Handle Non-UUID Primary Keys in Migration [LOW]
-
-**Location**: `lib/immu_table/migration.ex`
-
-**Problem**: `add_immutable_columns/0` assumes the table will use UUID for `id`. If converting an existing table with integer or other primary key types, the migration will conflict or produce incorrect schema.
-
-**Fix Required**:
-1. Document that ImmuTable requires UUID primary keys
-2. Or: Provide guidance for migrating tables with existing non-UUID primary keys
-3. Or: Support configurable id type (adds complexity)
-
----
-
-## Test Coverage Gaps
-
-| Area | Gap |
-|------|-----|
-| ~~Metadata tampering~~ | ✅ Fixed - 10 tests added |
-| ~~Custom changeset blocking~~ | ✅ Fixed - 4 tests added |
-| ~~Migration SQL~~ | ✅ Fixed - 5 integration tests added |
-| ~~Preload optimization~~ | ✅ Fixed - batch query implementation |
-| Association edge cases | No tests for invalid association names |
-| `at_time` boundaries | No tests for exact boundary conditions |
-
----
-
-## Recommended Next Steps
-
-1. ✅ ~~Add indexes to add_immutable_columns or create `add_immutable_indexes/1` macro [HIGH]~~ - FIXED
-2. ✅ ~~Optimize preload to batch queries (O(N²) → O(1))~~ - FIXED
-3. ✅ ~~Add migration integration tests~~ - FIXED
-4. ✅ ~~Decide on query behavior for deleted entities~~ - FIXED (added get_current/3)
-5. ✅ ~~Add has_many/has_one inverse associations~~ - FIXED
-6. **Add typespecs and improve documentation**
-7. **Consider full Ecto integration for associations** (cast_assoc, Repo.preload, etc.)
-
-### Phase 1 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Created mix project with supervisor
-✅ Added dependencies: `ecto_sql`, `uuidv7`, `postgrex`
-✅ Configured test database and Ecto.Repo
-✅ Created basic module structure (all stub files)
-✅ Project compiles with warnings-as-errors enabled
-
-**Files Created**:
-- `mix.exs` - Project configuration with dependencies
-- `config/config.exs`, `config/test.exs` - Configuration files
-- `lib/immu_table/application.ex` - Supervisor with TestRepo in test env
-- `test/support/test_repo.ex` - Test repository
-- `test/support/data_case.ex` - Test case template with sandbox
-- Stub modules: `schema.ex`, `operations.ex`, `query.ex`, `lock.ex`, `changeset.ex`, `associations.ex`, `migration.ex`, `exceptions.ex`
-
----
-
-### Phase 2 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `use ImmuTable` macro with options parsing
-✅ Created `immutable_schema/2` macro wrapping `Ecto.Schema.schema/2`
-✅ Injected required fields: `entity_id`, `version`, `valid_from`, `deleted_at`
-✅ Configured UUIDv7 as primary key type
-✅ Implemented changeset filtering via custom `cast/3` function
-✅ Stored options in module attributes accessible via `__immutable__/1`
-
-**Files Implemented**:
-- `lib/immu_table.ex` - `__using__/1` macro
-- `lib/immu_table/schema.ex` - `immutable_schema/2` macro, `__before_compile__/1` callback
-- `test/support/test_schemas.ex` - Test schemas with various configurations
-- `test/immu_table/schema_test.exs` - Comprehensive tests (12 tests, all passing)
-- `docker-compose.yml` - PostgreSQL test database configuration
-
-**Test Results**: 13/13 tests passing, compiles without warnings
-
----
-
-### Phase 3 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `insert/2` and `insert!/2` operations
-✅ Auto-generates UUIDv7 for `id` and `entity_id`
-✅ Sets `version: 1` for initial insert
-✅ Sets `valid_from` to current timestamp
-✅ Ensures `deleted_at: nil`
-✅ Works with both struct and changeset inputs
-
-**Files Implemented**:
-- `lib/immu_table/operations.ex` - Core insert operations
-- `lib/immu_table.ex` - Delegated public API
-- `test/immu_table/operations_test.exs` - Comprehensive tests (12 tests)
-- `priv/test_repo/migrations/20251202000001_create_test_tables.exs` - Test database schema
-- `config/config.exs` - Added ecto_repos configuration
-
-**Test Results**: 25/25 tests passing, compiles without warnings
-
----
-
-### Phase 4 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `update/3` and `update!/3` operations
-✅ Creates new version row with incremented version number
-✅ Old rows remain completely untouched (append-only)
-✅ Advisory locks prevent concurrent version conflicts
-✅ Fetches current version from database before updating
-✅ Handles not found and deleted entity errors
-✅ Works with map and changeset inputs
-✅ Concurrent updates serialize correctly via PostgreSQL locks
-
-**Files Implemented**:
-- `lib/immu_table/operations.ex` - Update operations with version increment
-- `lib/immu_table/lock.ex` - PostgreSQL advisory lock wrapper
-- `lib/immu_table.ex` - Delegated public API for update
-- `test/immu_table/operations_test.exs` - 14 update tests including concurrency
-- `test/immu_table/lock_test.exs` - 4 advisory lock tests
-
-**Test Results**: 43/43 tests passing (1 skipped for Phase 5)
-
----
-
-### Phase 5 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `delete/2` and `delete!/2` operations
-✅ Creates tombstone row with `deleted_at` timestamp
-✅ Copies all data fields from current version
-✅ Increments version number
-✅ Updates `valid_from` to current timestamp
-✅ Generates new UUIDv7 for tombstone `id`
-✅ Preserves `entity_id` across tombstone
-✅ Uses advisory locks for concurrency control
-✅ Returns error if entity not found
-✅ Returns error if entity already deleted
-✅ Old rows remain completely untouched (append-only)
-
-**Files Implemented**:
-- `lib/immu_table/operations.ex` - Added `delete/2`, `delete!/2`, `prepare_delete_changeset/1`
-- `lib/immu_table.ex` - Delegated public API for delete operations
-- `test/immu_table/operations_test.exs` - 14 comprehensive delete tests
-
-**Test Results**: 57/57 tests passing (all delete tests now enabled)
-
----
-
-### Phase 6 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `undelete/2` and `undelete!/2` operations
-✅ Restores tombstoned entities by creating new row with `deleted_at: nil`
-✅ Copies all data fields from tombstone version
-✅ Increments version number from tombstone
-✅ Updates `valid_from` to current timestamp
-✅ Generates new UUIDv7 for restored `id`
-✅ Preserves `entity_id` across restoration
-✅ Uses advisory locks for concurrency control
-✅ Accepts optional changes to apply during undelete
-✅ Returns error if entity not found
-✅ Returns error if entity not deleted
-✅ Supports delete/undelete cycles correctly
-✅ Old rows (including tombstones) remain untouched
-
-**Files Implemented**:
-- `lib/immu_table/operations.ex` - Added `undelete/2`, `undelete!/2`, `fetch_latest_version/2`, `prepare_undelete_changeset/2`
-- `lib/immu_table.ex` - Delegated public API for undelete operations
-- `test/immu_table/operations_test.exs` - 15 comprehensive undelete tests
-
-**Test Results**: 72/72 tests passing (all CRUD operations complete)
-
----
-
-### Phase 7 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `current/1` - returns latest non-deleted version of each entity
-✅ Implemented `history/2` - returns all versions of a specific entity
-✅ Implemented `at_time/2` - returns versions valid at specific timestamp
-✅ Implemented `all_versions/1` - returns all rows without filtering
-✅ Implemented `include_deleted/1` - returns latest versions including tombstones
-✅ All query helpers compose with standard Ecto queries
-✅ Efficient implementation using subqueries with max(version)
-✅ Handles delete/undelete cycles correctly
-
-**Files Implemented**:
-- `lib/immu_table/query.ex` - All query helper functions with composable design
-- `test/immu_table/query_test.exs` - 18 comprehensive query tests
-
-**Test Results**: 117/117 tests passing (99 existing + 18 query tests)
-
-**Query Helper Examples**:
-```elixir
-# Get current (non-deleted) users
-User |> ImmuTable.Query.current() |> Repo.all()
-
-# Get complete history of a user
-User |> ImmuTable.Query.history(entity_id) |> Repo.all()
-
-# Time travel query
-User |> ImmuTable.Query.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
-
-# Include deleted in results
-User |> ImmuTable.Query.include_deleted() |> Repo.all()
-```
-
----
-
-### Phase 8 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `ImmuTable.ImmutableViolationError` exception
-✅ Created blocking logic via `Ecto.Changeset.prepare_changes/2`
-✅ Injected `maybe_block_updates/2` and `maybe_block_deletes/2` helpers
-✅ Auto-inject blocking into schemas without custom changeset
-✅ Provided helper functions for schemas with custom changesets
-✅ Respected `allow_updates: true` and `allow_deletes: true` options
-✅ Clear, actionable error messages guide users to correct API
-
-**Files Implemented**:
-- `lib/immu_table/exceptions.ex` - `ImmuTable.ImmutableViolationError` exception
-- `lib/immu_table/changeset.ex` - `block_updates/2` and `block_deletes/2` functions
-- `lib/immu_table/schema.ex` - Injected blocking helpers and optional default changeset
-- `test/immu_table/blocking_test.exs` - 8 comprehensive blocking tests
-- `test/integration/user_integration_test.exs` - 4 additional blocking scenarios
-- `priv/test_repo/migrations/20251202000003_create_blocking_test_tables.exs` - Test tables for blocking tests
-
-**Test Results**: 129/129 tests passing (117 existing + 8 blocking tests + 4 integration tests)
-
-**Implementation Notes**:
-- Blocking happens via `prepare_changes` callback, executed during transaction
-- Default `changeset/2` function injected for schemas without custom implementation
-- Schemas with custom changesets call `maybe_block_updates/2` and `maybe_block_deletes/2` explicitly
-- Conditional compilation: only inject default changeset if not already defined
-- Error messages include schema name and suggest using `ImmuTable.update/3` or `ImmuTable.delete/2`
-
----
-
-### Phase 9 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Implemented `immutable_belongs_to/3` macro for defining associations
-✅ Created `{field}_entity_id` fields instead of standard `{field}_id`
-✅ Implemented `ImmuTable.preload/3` to load current versions of associations
-✅ Handles single struct and list of structs for preloading
-✅ Preload resolves to current version after associated entity updates
-✅ Preload returns nil for deleted associations
-✅ Implemented `ImmuTable.join/2` for joining with current association versions
-✅ Join excludes deleted associations automatically
-✅ Registered `:immutable_associations` as accumulate attribute
-✅ Created `__associations__/0` function for runtime access to association metadata
-
-**Files Implemented**:
-- `lib/immu_table/associations.ex` - Association macro and helpers
-- `lib/immu_table.ex` - Added preload and join delegations, registered associations attribute
-- `lib/immu_table/schema.ex` - Added `__associations__/0` function injection
-- `test/immu_table/associations_test.exs` - 13 comprehensive association tests
-- `priv/test_repo/migrations/20251202000004_create_association_test_tables.exs` - Test tables for associations
-
-**Test Results**: 142/142 tests passing (129 existing + 13 association tests)
-
-**Implementation Notes**:
-- Associations reference `entity_id` instead of `id` for version-stable relationships
-- Preload uses `ImmuTable.Query.current()` to resolve to latest non-deleted version
-- Join creates inner join with current subquery and excludes deleted associations
-- Association metadata stored at compile time via `@immutable_associations` attribute
-- Runtime access via `__associations__/0` function returns map of `%{name => {module, opts}}`
-- Join bindings require accounting for `current()` subquery binding when using positional references
-
----
-
-### Phase 10 Completion Details
-
-**Completed**: 2025-12-02
-
-✅ Created `ImmuTable.Migration` module with helper macros
-✅ Implemented `create_immutable_table/2` macro for creating tables
-✅ Auto-adds all required immutable columns (id, entity_id, version, valid_from, deleted_at)
-✅ Auto-creates recommended indexes (entity_id, entity_id+version composite, valid_from)
-✅ Supports custom columns in do block
-✅ Implemented `add_immutable_columns/0` macro for converting existing tables
-✅ Comprehensive documentation with usage examples
-✅ Macros merge provided options with defaults (primary_key: false)
-
-**Files Implemented**:
-- `lib/immu_table/migration.ex` - Migration helper macros with documentation
-- `test/immu_table/migration_test.exs` - 4 tests verifying macro exports and documentation
-
-**Test Results**: 146/146 tests passing (142 existing + 4 migration tests)
-
-**Implementation Notes**:
-- `create_immutable_table` sets `primary_key: false` and creates uuid id column
-- Automatically adds three indexes: entity_id, (entity_id, version), valid_from
-- `add_immutable_columns` for use in `alter table` blocks when converting existing tables
-- Macros expand at compile time to generate standard Ecto.Migration code
-- Users import `ImmuTable.Migration` in their migration modules
-
-**Usage Example**:
-```elixir
-defmodule MyApp.Repo.Migrations.CreateUsers do
-  use Ecto.Migration
-  import ImmuTable.Migration
-
-  def change do
-    create_immutable_table :users do
-      add :email, :string
-      add :name, :string
-    end
-  end
-end
-```
-
----
-
-## Overview
-
-ImmuTable is an Elixir library that makes Ecto tables immutable. Instead of updating or deleting rows, new rows are inserted with version tracking metadata. This provides a complete audit trail and enables point-in-time queries.
 
 ## Core Concepts
 
@@ -639,7 +162,7 @@ ImmuTable is an Elixir library that makes Ecto tables immutable. Instead of upda
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `id` | UUID v7 | Primary key, time-sortable |
+| `id` | UUID v7 | Primary key, time-sortable, unique per version |
 | `entity_id` | UUID v7 | Groups all versions of logical entity |
 | `version` | integer | Explicit version number (1, 2, 3...) |
 | `valid_from` | utc_datetime_usec | When this version became active |
@@ -652,14 +175,6 @@ The current row for an entity is determined by:
 1. Find the row with `MAX(version)` for the given `entity_id`
 2. If that row has `deleted_at IS NULL`, the entity is current
 3. If that row has `deleted_at` set, the entity is deleted
-
-This approach correctly handles delete/undelete cycles:
-
-```
-v1: {name: "foo", deleted_at: nil}     ← was current
-v2: {name: "foo", deleted_at: ~U[...]} ← tombstone (deleted)
-v3: {name: "foo", deleted_at: nil}     ← current (undeleted)
-```
 
 ### Tombstone Rows
 
@@ -676,328 +191,6 @@ Foreign keys reference `entity_id` (not `id`). Query helpers resolve to current 
 
 Uses PostgreSQL advisory locks on `entity_id` during update/delete operations to ensure atomic version increments.
 
-### Blocking Direct Modifications
-
-By default, `Repo.update` and `Repo.delete` are blocked on immutable schemas. Configurable via:
-
-```elixir
-use ImmuTable, allow_updates: true
-use ImmuTable, allow_deletes: true
-```
-
----
-
-## Target API
-
-```elixir
-defmodule MyApp.Account do
-  use Ecto.Schema
-  use ImmuTable
-
-  immutable_schema "accounts" do
-    field :name, :string
-    field :balance, :decimal
-
-    immutable_belongs_to :user, MyApp.User
-  end
-end
-
-# Insert
-{:ok, account} = ImmuTable.insert(Repo, %Account{name: "Checking", balance: 100})
-# => %Account{id: <uuid>, entity_id: <uuid>, version: 1, ...}
-
-# Update (creates new version)
-{:ok, updated} = ImmuTable.update(Repo, account, %{balance: 150})
-# => %Account{id: <new-uuid>, entity_id: <same-uuid>, version: 2, ...}
-
-# Delete (creates tombstone)
-{:ok, deleted} = ImmuTable.delete(Repo, account)
-# => %Account{..., version: 3, deleted_at: ~U[...]}
-
-# Undelete
-{:ok, restored} = ImmuTable.undelete(Repo, deleted)
-# => %Account{..., version: 4, deleted_at: nil}
-
-# Query current versions
-Account |> ImmuTable.current() |> Repo.all()
-
-# Query history
-Account |> ImmuTable.history(entity_id) |> Repo.all()
-
-# Query at point in time
-Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
-```
-
----
-
-## Implementation Phases
-
-### Phase 1: Project Setup
-
-**Objective**: Create mix project with required dependencies and structure.
-
-**Tasks**:
-- Create mix project with `--sup` flag
-- Add dependencies: `ecto_sql`, `uuidv7`, `postgrex` (dev/test)
-- Configure test database
-- Set up basic module structure
-
-**Tests**:
-- Project compiles
-- Dependencies resolve
-
-**Files**:
-- `mix.exs`
-- `lib/immu_table.ex`
-- `lib/immu_table/application.ex`
-- `config/config.exs`
-- `config/test.exs`
-
----
-
-### Phase 2: Schema Macro & Field Injection
-
-**Objective**: Implement `use ImmuTable` macro that injects required fields.
-
-**Tasks**:
-- Create `ImmuTable.Schema` module
-- Implement `__using__/1` macro with options parsing
-- Create `immutable_schema/2` macro wrapping `Ecto.Schema.schema/2`
-- Inject fields: `entity_id`, `version`, `valid_from`, `deleted_at`
-- Configure UUIDv7 as primary key type
-- Mark `version` as non-writable by default (via changeset filtering)
-
-**Tests**:
-- Schema has all required fields with correct types
-- `version` rejected in changeset by default
-- `version` accepted when `allow_version_write: true`
-- Options correctly parsed and stored in module attributes
-
-**Files**:
-- `lib/immu_table/schema.ex`
-- `test/immu_table/schema_test.exs`
-- `test/support/test_schemas.ex`
-
----
-
-### Phase 3: Insert Operations
-
-**Objective**: Implement insert that auto-generates immutability metadata.
-
-**Tasks**:
-- Create `ImmuTable.Operations` module
-- Implement `insert/2` and `insert!/2`
-- Generate UUIDv7 for `id` and `entity_id`
-- Set `version: 1`, `valid_from: DateTime.utc_now()`
-- Ensure `deleted_at: nil`
-
-**Tests**:
-- Insert generates correct `id` (UUIDv7)
-- Insert generates correct `entity_id` (UUIDv7)
-- `version` is 1
-- `valid_from` is set to current time
-- `deleted_at` is nil
-- Works with changeset input
-- Works with struct input
-
-**Files**:
-- `lib/immu_table/operations.ex`
-- `test/immu_table/operations_test.exs`
-
----
-
-### Phase 4: Update Operations (Versioned Insert)
-
-**Objective**: Implement update that creates a new version row.
-
-**Tasks**:
-- Implement `update/3` and `update!/3`
-- Create `ImmuTable.Lock` module for advisory locks
-- Acquire advisory lock on `entity_id`
-- Fetch current version number from database
-- Insert new row with: same `entity_id`, `version + 1`, new `valid_from`, merged changes
-- Release lock (automatic on transaction end)
-- Handle changeset and map inputs
-
-**Tests**:
-- New row created with incremented version
-- Old row completely untouched (verify all fields)
-- `entity_id` preserved across versions
-- Changes applied to new row
-- `valid_from` updated to current time
-- Concurrent updates serialize correctly (no duplicate versions)
-- Lock prevents race conditions
-- Returns error if entity not found
-- Returns error if entity is deleted (tombstoned)
-
-**Files**:
-- `lib/immu_table/operations.ex` (extend)
-- `lib/immu_table/lock.ex`
-- `test/immu_table/lock_test.exs`
-- `test/immu_table/operations_test.exs` (extend)
-
----
-
-### Phase 5: Delete Operations (Tombstone)
-
-**Objective**: Implement delete that creates a tombstone row.
-
-**Tasks**:
-- Implement `delete/2` and `delete!/2`
-- Acquire advisory lock on `entity_id`
-- Copy all fields from current version
-- Insert tombstone: same `entity_id`, `version + 1`, `deleted_at: now`
-- All other fields duplicated from previous version
-
-**Tests**:
-- Tombstone row created
-- All data fields copied from previous version
-- `deleted_at` set to current time
-- `version` incremented
-- `valid_from` set to current time
-- Returns error if entity already deleted
-- Returns error if entity not found
-
-**Files**:
-- `lib/immu_table/operations.ex` (extend)
-- `test/immu_table/operations_test.exs` (extend)
-
----
-
-### Phase 6: Undelete Operations
-
-**Objective**: Implement undelete that restores a tombstoned entity.
-
-**Tasks**:
-- Implement `undelete/2` and `undelete!/2`
-- Acquire advisory lock on `entity_id`
-- Copy all fields from tombstone row
-- Insert new row: `version + 1`, `deleted_at: nil`
-- Optionally accept changes to apply during undelete
-
-**Tests**:
-- New current row created from tombstone data
-- `deleted_at` is nil on restored row
-- `version` incremented
-- Entity appears in current queries again
-- Returns error if entity not deleted
-- Returns error if entity not found
-- Optional changes applied during undelete
-
-**Files**:
-- `lib/immu_table/operations.ex` (extend)
-- `test/immu_table/operations_test.exs` (extend)
-
----
-
-### Phase 7: Query Helpers
-
-**Objective**: Implement query composable functions for immutable tables.
-
-**Tasks**:
-- Create `ImmuTable.Query` module
-- Implement `current/1` - latest version per entity where `deleted_at IS NULL`
-- Implement `history/2` - all versions of entity ordered by version
-- Implement `at_time/2` - version valid at specific timestamp
-- Implement `all_versions/1` - no filtering, all rows
-- Implement `include_deleted/1` - latest versions including tombstones
-- Use subqueries for efficient current resolution
-
-**Tests**:
-- `current/1` excludes old versions
-- `current/1` excludes deleted entities
-- `current/1` returns undeleted entities correctly (after delete/undelete cycle)
-- `history/2` returns all versions in order
-- `history/2` includes tombstone rows
-- `at_time/2` returns correct historical version
-- `at_time/2` returns nil/empty for time before entity existed
-- `include_deleted/1` includes tombstoned entities
-- All helpers compose with other Ecto queries
-
-**Files**:
-- `lib/immu_table/query.ex`
-- `test/immu_table/query_test.exs`
-
----
-
-### Phase 8: Blocking Repo.update/delete
-
-**Objective**: Prevent direct Repo operations on immutable schemas.
-
-**Tasks**:
-- Create `ImmuTable.Changeset` module
-- Implement blocking via `Ecto.Changeset.prepare_changes/2`
-- Store `__immutable__` metadata in schema
-- Create `ImmuTable.ImmutableViolationError` exception
-- Raise on blocked operations
-- Respect `allow_updates: true` option
-- Respect `allow_deletes: true` option
-- Provide clear error messages
-
-**Tests**:
-- `Repo.update` raises `ImmutableViolationError` by default
-- `Repo.delete` raises `ImmutableViolationError` by default
-- `allow_updates: true` permits `Repo.update`
-- `allow_deletes: true` permits `Repo.delete`
-- Error messages are helpful
-
-**Files**:
-- `lib/immu_table/changeset.ex`
-- `lib/immu_table/exceptions.ex`
-- `test/immu_table/blocking_test.exs`
-
----
-
-### Phase 9: Association Support
-
-**Objective**: Implement immutable-aware associations.
-
-**Tasks**:
-- Create `ImmuTable.Associations` module
-- Implement `immutable_belongs_to/3` macro
-- Store `{field}_entity_id` instead of `{field}_id`
-- Implement preload helper that resolves to current versions
-- Implement join helpers for queries
-- Handle case where associated entity is deleted
-
-**Tests**:
-- `immutable_belongs_to` creates correct field
-- Association stores `entity_id`
-- Preload returns current version of associated entity
-- Preload works after associated entity updated
-- Join queries work correctly
-- Graceful handling of deleted associations
-
-**Files**:
-- `lib/immu_table/associations.ex`
-- `test/immu_table/associations_test.exs`
-
----
-
-### Phase 10: Migration Helpers
-
-**Objective**: Provide helpers for creating immutable tables.
-
-**Tasks**:
-- Create `ImmuTable.Migration` module
-- Implement `create_immutable_table/2` macro
-- Auto-add required columns with correct types
-- Generate recommended indexes:
-  - Primary key on `id`
-  - Index on `entity_id`
-  - Composite index on `(entity_id, version)` for current lookups
-  - Index on `valid_from` for temporal queries
-- Implement `add_immutable_columns/0` for converting existing tables
-
-**Tests**:
-- Migration creates correct columns
-- Migration creates correct indexes
-- Conversion helper adds columns to existing table
-
-**Files**:
-- `lib/immu_table/migration.ex`
-- `test/immu_table/migration_test.exs`
-
 ---
 
 ## Module Structure
@@ -1006,15 +199,19 @@ Account |> ImmuTable.at_time(~U[2024-01-15 10:00:00Z]) |> Repo.all()
 lib/
   immu_table.ex              # Main module, public API
   immu_table/
-    application.ex              # Supervisor
-    schema.ex                   # use macro, immutable_schema
-    operations.ex               # insert, update, delete, undelete
-    query.ex                    # current, history, at_time helpers
-    lock.ex                     # Advisory lock helpers
-    changeset.ex                # Changeset helpers, field protection
-    associations.ex             # immutable_belongs_to, preload helpers
-    migration.ex                # Migration helpers
-    exceptions.ex               # ImmutableViolationError
+    application.ex           # Supervisor
+    schema.ex                # use macro, immutable_schema
+    operations.ex            # insert, update, delete, undelete
+    query.ex                 # current, history, at_time, get, get!, fetch_current
+    lock.ex                  # Advisory lock helpers
+    changeset.ex             # Changeset helpers, field protection
+    associations.ex          # immutable_belongs_to, has_many, has_one, preload
+    migration.ex             # Migration helpers
+    exceptions.ex            # ImmutableViolationError
+
+demo/                        # Phoenix LiveView demo app
+  lib/demo/tasks/            # Example ImmuTable schema
+  lib/demo_web/live/         # LiveView CRUD with history
 
 test/
   immu_table/
@@ -1025,27 +222,9 @@ test/
     blocking_test.exs
     associations_test.exs
     migration_test.exs
-    uuid_test.exs
-  support/
-    data_case.ex                # Test case with sandbox
-    test_repo.ex                # Test repository
-    test_schemas.ex             # Test schema definitions
-    migrations/                 # Test migrations
-
-priv/
-  test_repo/
-    migrations/                 # Migrations for test database
+  integration/
+    user_integration_test.exs
 ```
-
----
-
-## Dependencies
-
-### Runtime
-- `ecto_sql` ~> 3.10
-
-### Development/Test
-- `postgrex` ~> 0.17
 
 ---
 
@@ -1062,10 +241,11 @@ use ImmuTable,
 
 ## Success Criteria
 
-1. All tests pass
-2. No modifications to existing rows during update/delete operations
-3. Correct current row resolution after delete/undelete cycles
-4. Concurrent operations serialize correctly
-5. Clear error messages when blocking direct modifications
-6. Associations resolve to current versions
-7. Query helpers compose with standard Ecto queries
+1. ✅ All tests pass (235 tests)
+2. ✅ No modifications to existing rows during update/delete operations
+3. ✅ Correct current row resolution after delete/undelete cycles
+4. ✅ Concurrent operations serialize correctly
+5. ✅ Clear error messages when blocking direct modifications
+6. ✅ Associations resolve to current versions
+7. ✅ Query helpers compose with standard Ecto queries
+8. ✅ Demo app demonstrates all features
