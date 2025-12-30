@@ -1,8 +1,8 @@
 defmodule ImmuTable.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
-  @source_url "https://github.com/ck/immu_table"
+  @version "0.5.0"
+  @source_url "https://github.com/ckochx/immu_table"
 
   def project do
     [
@@ -64,7 +64,7 @@ defmodule ImmuTable.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.10"},
-      {:uuidv7, "~> 0.2"},
+      {:uuidv7, "~> 0.2 or ~> 1.0"},
       {:postgrex, "~> 0.16", only: [:dev, :test]},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false}
     ]

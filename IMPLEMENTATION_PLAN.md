@@ -18,6 +18,7 @@
 | Phase 10: Migration Helpers | ✅ Complete | Macros exist with full integration tests, add_immutable_indexes/1 added |
 | Phase 11: Mix Generators | ✅ Complete | Schema, context, and migration generators with tests |
 | Phase 12: Enhanced Generators | 🔄 In Progress | Phase 12.0 complete; HTML & LiveView generators planned |
+| Phase 13: Repo Function Parity | 📋 Planned | Missing functions identified; see detailed analysis below |
 | **Demo App** | ✅ Complete | Phoenix LiveView CRUD app demonstrating all features |
 
 ---
@@ -265,6 +266,221 @@ priv/templates/
 
 ---
 
+## Phase 13: Repo Function Parity & Ecto Compliance (Planned)
+
+**Goal**: Add missing Repo-like functions and address Ecto expectation violations.
+
+**Analysis Date**: 2025-12-30
+
+### Missing Repo Functions
+
+#### High Priority
+
+| Function | Description | Implementation Notes |
+|----------|-------------|---------------------|
+| `get_by/4` | Get by arbitrary fields | `ImmuTable.get_by(Task, Repo, title: "Important")` - wraps `get_current()` with `where` |
+| `get_by!/4` | Same, raising version | Raises `Ecto.NoResultsError` |
+| `exists?/3` | Check if entity exists | `ImmuTable.exists?(Task, Repo, entity_id)` - returns boolean |
+| `reload/2` | Get fresh latest version | `ImmuTable.reload(Repo, struct)` - re-fetches by entity_id |
+| `count/2` | Count current entities | `ImmuTable.count(Task, Repo)` or `ImmuTable.Query.count_current(Task)` |
+
+#### Medium Priority
+
+| Function | Description | Implementation Notes |
+|----------|-------------|---------------------|
+| `insert_or_update/3` | Insert v1 or create new version | Common upsert pattern adapted for immutables |
+| `Query.deleted_only/1` | Inverse of `get_current` | Return only tombstones (latest version where `deleted_at IS NOT NULL`) |
+| `Query.stream_current/1` | Memory-efficient iteration | For large datasets, uses `Repo.stream` internally |
+
+#### Lower Priority (Complex)
+
+| Function | Description | Complexity |
+|----------|-------------|------------|
+| `insert_all/3` | Bulk inserts | Needs entity_id generation strategy for batches |
+| `delete_all/2` | Bulk soft delete | Complex with advisory locking |
+
+### Lacking Implementations
+
+#### 13.1: Option Passthrough
+
+**Problem**: `ImmuTable.insert/2`, `update/3`, `delete/2` don't pass options to underlying Repo calls.
+
+**Missing Options**:
+- `prefix:` - Multi-tenancy support
+- `returning:` - Select which fields to return
+- `timeout:` - Query timeout
+
+**Location**: `lib/immu_table/operations.ex:28` - `repo.insert(changeset)` doesn't accept opts
+
+**Fix**: Add optional `opts` parameter to all operations:
+```elixir
+def insert(repo, struct_or_changeset, opts \\ [])
+def update(repo, struct, changes, opts \\ [])
+def delete(repo, struct, opts \\ [])
+```
+
+#### 13.2: Specific Exception Types
+
+**Problem**: `update!/3` and `delete!/2` raise generic `RuntimeError` instead of specific exceptions.
+
+**Location**: `lib/immu_table/operations.ex:115-122`
+
+**Current**:
+```elixir
+{:error, :not_found} -> raise "Entity not found"
+{:error, :deleted} -> raise "Cannot update deleted entity"
+```
+
+**Proposed**: Create specific exceptions:
+```elixir
+defmodule ImmuTable.NotFoundError do
+  defexception [:entity_id, :schema, :message]
+end
+
+defmodule ImmuTable.DeletedError do
+  defexception [:entity_id, :schema, :message]
+end
+```
+
+#### 13.3: `get!/3` Error Distinction
+
+**Problem**: `get!/3` raises same `Ecto.NoResultsError` for both "not found" and "deleted".
+
+**Location**: `lib/immu_table/query.ex:182-185`
+
+**Current**:
+```elixir
+{:error, _} -> raise Ecto.NoResultsError, queryable: queryable
+```
+
+**Options**:
+1. Raise `ImmuTable.DeletedError` for deleted entities
+2. Add option `raise_on_deleted: true` (default) to control behavior
+3. Keep as-is but document clearly
+
+#### 13.4: Query Ordering Defaults
+
+**Problem**: `get_current/1` doesn't specify explicit ordering, relies on subquery behavior.
+
+**Location**: `lib/immu_table/query.ex:28-32`
+
+**Risk**: While correct, lack of explicit `order_by` could confuse users or cause issues with certain query compositions.
+
+### Breaking Ecto Expectations
+
+#### 13.5: Argument Order (Documentation)
+
+**Issue**: Different from Ecto conventions:
+- Ecto: `Repo.get(Schema, id)`
+- ImmuTable: `ImmuTable.get(Schema, Repo, entity_id)`
+
+**Decision**: Keep current order (Schema first enables better function composition), but:
+- Add prominent warning in README
+- Add `@doc` examples showing the difference
+- Consider alias helpers in future
+
+#### 13.6: No `get/2` by Primary Key (id)
+
+**Issue**: Users may expect `ImmuTable.get(Task, Repo, row_id)` to work with `id` field.
+
+**Decision**: Intentional design - users should use `entity_id`. Document that:
+- `id` is row-level, changes per version
+- `entity_id` is entity-level, stable across versions
+- Use `Repo.get(Task, row_id)` directly if raw row access needed
+
+#### 13.7: `at_time/2` Returns Deleted Entities
+
+**Issue**: Querying at a time when entity was deleted returns the tombstone row.
+
+**Location**: `lib/immu_table/query.ex:66-78`
+
+**Current Behavior**: Returns whatever version was latest at that time, including tombstones.
+
+**Options**:
+1. Add `at_time/3` with `include_deleted: false` option (default)
+2. Document current behavior as intentional (audit trail use case)
+3. Add `at_time_active/2` helper that filters deleted
+
+**Recommendation**: Option 2 - current behavior is correct for audit trails. Add helper for filtering:
+```elixir
+def at_time_active(queryable, timestamp) do
+  queryable
+  |> at_time(timestamp)
+  |> where([u], is_nil(u.deleted_at))
+end
+```
+
+#### 13.8: Nested Transaction Behavior
+
+**Issue**: `update/3` wraps in transaction internally. If user already inside Multi/transaction, creates nested transaction.
+
+**Location**: `lib/immu_table/operations.ex:76`
+
+**Mitigation**: PostgreSQL handles via savepoints. Document this behavior:
+- ImmuTable operations always use transactions
+- Safe to use inside `Ecto.Multi` (becomes savepoint)
+- Advisory locks are transaction-scoped
+
+#### 13.9: Known Limitation - `Ecto.Changeset.cast` Bypasses Blocking
+
+**Status**: Already documented in IMPLEMENTATION_PLAN.md and blocking_test.exs
+
+**Location**: `test/immu_table/blocking_test.exs:158-189`
+
+### Code Quality Issues
+
+#### 13.10: Changeset Error Propagation
+
+**Problem**: In `prepare_update_changeset`, errors are copied but changeset is rebuilt on empty struct.
+
+**Location**: `lib/immu_table/operations.ex:337-345`
+
+**Current**:
+```elixir
+|> then(fn cs ->
+  if changeset.valid? do
+    cs
+  else
+    Enum.reduce(changeset.errors, cs, fn {field, {msg, opts}}, acc ->
+      Ecto.Changeset.add_error(acc, field, msg, opts)
+    end)
+  end
+end)
+```
+
+**Issue**: Original changeset validations ran against empty struct, not current data. Errors are transferred but context may be lost.
+
+**Fix**: Run changeset validation against current struct data, not empty struct.
+
+### Implementation Priority
+
+| Priority | Item | Effort | Impact |
+|----------|------|--------|--------|
+| 1 | `get_by/4` and `get_by!/4` | Low | High - common pattern |
+| 2 | Option passthrough (`prefix:`, etc.) | Medium | High - blocking for multi-tenant |
+| 3 | `exists?/3` | Low | Medium - convenience |
+| 4 | Specific exceptions | Low | Medium - better DX |
+| 5 | `reload/2` | Low | Medium - common need |
+| 6 | `count/2` | Low | Medium - convenience |
+| 7 | Documentation updates | Low | High - prevent confusion |
+| 8 | `at_time_active/2` helper | Low | Low - niche use case |
+| 9 | `Query.deleted_only/1` | Low | Low - admin use case |
+| 10 | `insert_or_update/3` | Medium | Medium - common pattern |
+
+### Test Coverage Needed
+
+New tests for Phase 13:
+- `get_by/4` with various field combinations
+- `get_by!/4` raising behavior
+- `exists?/3` for existing, deleted, and non-existent entities
+- `reload/2` after concurrent modifications
+- `count/2` with and without filters
+- Option passthrough for `prefix:`, `timeout:`
+- Exception types and messages
+- `at_time_active/2` filtering
+
+---
+
 ## Previous Updates (2025-12-29)
 
 ### Ergonomic Query Functions
@@ -321,7 +537,7 @@ See `demo/GENERATORS.md` for setup instructions.
 ## Summary
 
 ### Completed Phases
-All 11 implementation phases are now complete:
+All 11 core implementation phases are now complete:
 - ✅ Phase 1-8: Core functionality (insert, update, delete, undelete, queries, blocking)
 - ✅ Phase 9: Association support (belongs_to, has_many, has_one with batch preloading)
 - ✅ Phase 10: Migration helpers (create_immutable_table, add_immutable_indexes)
@@ -341,18 +557,25 @@ All 11 implementation phases are now complete:
 - ✅ ExDoc configuration (`mix docs`)
 - ✅ Mix generators (schema, context, migration)
 
-### Remaining Work (LOW Priority)
+### Remaining Work
+
+**Phase 12: Enhanced Generators** (In Progress)
+- HTML and LiveView generators with ImmuTable-aware templates
+- External template system with customization support
+- Test and fixture generation
+
+**Phase 13: Repo Function Parity** (Planned)
+- Missing functions: `get_by/4`, `exists?/3`, `reload/2`, `count/2`
+- Option passthrough (`prefix:`, `timeout:`, `returning:`)
+- Specific exception types (`NotFoundError`, `DeletedError`)
+- Documentation for Ecto expectation differences
+
+### Lower Priority
 - Typespecs for public API
 - Ecto.Multi integration docs
-- Batch operations (insert_all, update_all)
+- Batch operations (insert_all, delete_all)
 - Hardcoded timestamp source
 - Full Ecto integration for associations (cast_assoc, Repo.preload)
-
-### Future Enhancement
-- **Phase 12: Enhanced Generators** - See detailed plan above
-  - HTML and LiveView generators with ImmuTable-aware templates
-  - External template system with customization support
-  - Test and fixture generation
 
 ---
 

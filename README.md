@@ -234,6 +234,8 @@ Configure behavior per-schema:
 ```elixir
 use ImmuTable, allow_updates: true   # Permit Repo.update (bypasses immutability)
 use ImmuTable, allow_deletes: true   # Permit Repo.delete (bypasses immutability)
+use ImmuTable, allow_version_write: true   # Permit :version in changesets (default: false, preserves monotonic versioning)
+use ImmuTable, show_row_id: true   # Show `id` field in `Inspect` output
 ```
 
 By default, direct `Repo.update` and `Repo.delete` calls raise `ImmutableViolationError`.
