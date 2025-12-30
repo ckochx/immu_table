@@ -67,26 +67,43 @@ defmodule ImmuTable do
   @doc """
   Inserts version 1 of a new entity.
 
+  Accepts either `insert(repo, struct_or_changeset)` or `insert(changeset, repo)`
+  for pipe-friendly syntax:
+
+      %Task{}
+      |> Task.changeset(attrs)
+      |> ImmuTable.insert(Repo)
+
   See `ImmuTable.Operations.insert/2` for details.
   """
-  defdelegate insert(repo, struct_or_changeset), to: ImmuTable.Operations
+  def insert(first, second), do: ImmuTable.Operations.insert(first, second)
 
   @doc """
   Same as `insert/2` but raises on validation errors.
   """
-  defdelegate insert!(repo, struct_or_changeset), to: ImmuTable.Operations
+  def insert!(first, second), do: ImmuTable.Operations.insert!(first, second)
 
   @doc """
   Creates a new version by inserting a new row.
 
+  Accepts either 3 args (repo, struct, changes) or 2 args (repo, changeset).
+  The 2-arg version extracts the struct from changeset.data and enables
+  pipe-friendly syntax:
+
+      user
+      |> User.changeset(params)
+      |> ImmuTable.update(Repo)
+
   See `ImmuTable.Operations.update/3` for details.
   """
   defdelegate update(repo, struct, changes_or_changeset), to: ImmuTable.Operations
+  defdelegate update(repo_or_changeset, changeset_or_repo), to: ImmuTable.Operations
 
   @doc """
   Same as `update/3` but raises on errors.
   """
   defdelegate update!(repo, struct, changes_or_changeset), to: ImmuTable.Operations
+  defdelegate update!(repo_or_changeset, changeset_or_repo), to: ImmuTable.Operations
 
   @doc """
   Creates a tombstone by inserting a new row with deleted_at set.
@@ -133,4 +150,20 @@ defmodule ImmuTable do
   See `ImmuTable.Query.fetch_current/3` for details.
   """
   defdelegate fetch_current(queryable, repo, entity_id), to: ImmuTable.Query
+
+  @doc """
+  Gets the current version of an entity by entity_id.
+
+  Returns the struct or `nil` if not found or deleted.
+  See `ImmuTable.Query.get/3` for details.
+  """
+  defdelegate get(queryable, repo, entity_id), to: ImmuTable.Query
+
+  @doc """
+  Gets the current version of an entity by entity_id, raising if not found.
+
+  Raises `Ecto.NoResultsError` if not found or deleted.
+  See `ImmuTable.Query.get!/3` for details.
+  """
+  defdelegate get!(queryable, repo, entity_id), to: ImmuTable.Query
 end

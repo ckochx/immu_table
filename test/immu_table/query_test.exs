@@ -608,4 +608,127 @@ defmodule ImmuTable.QueryTest do
       assert result.name == "Ella"
     end
   end
+
+  describe "get/3" do
+    test "returns struct for existing non-deleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_test@test.com", name: "GetTest", status: "active"})
+        )
+
+      {:ok, _v2} = ImmuTable.update(TestRepo, v1, %{name: "GetTest Updated"})
+
+      result = ImmuTable.Query.get(User, TestRepo, v1.entity_id)
+      assert result.name == "GetTest Updated"
+      assert result.version == 2
+    end
+
+    test "returns nil for deleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_deleted@test.com", name: "Deleted", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
+
+      assert ImmuTable.Query.get(User, TestRepo, v1.entity_id) == nil
+    end
+
+    test "returns nil for non-existent entity" do
+      fake_entity_id = UUIDv7.generate()
+      assert ImmuTable.Query.get(User, TestRepo, fake_entity_id) == nil
+    end
+
+    test "returns struct for undeleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_undeleted@test.com", name: "Undeleted", status: "active"})
+        )
+
+      {:ok, v2} = ImmuTable.delete(TestRepo, v1)
+      {:ok, _v3} = ImmuTable.undelete(TestRepo, v2, %{name: "Restored"})
+
+      result = ImmuTable.Query.get(User, TestRepo, v1.entity_id)
+      assert result.name == "Restored"
+      assert result.version == 3
+    end
+
+    test "works via top-level ImmuTable module delegation" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_delegate@test.com", name: "Delegate", status: "active"})
+        )
+
+      result = ImmuTable.get(User, TestRepo, v1.entity_id)
+      assert result.name == "Delegate"
+    end
+  end
+
+  describe "get!/3" do
+    test "returns struct for existing non-deleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_bang@test.com", name: "GetBang", status: "active"})
+        )
+
+      {:ok, _v2} = ImmuTable.update(TestRepo, v1, %{name: "GetBang Updated"})
+
+      result = ImmuTable.Query.get!(User, TestRepo, v1.entity_id)
+      assert result.name == "GetBang Updated"
+      assert result.version == 2
+    end
+
+    test "raises for deleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_bang_deleted@test.com", name: "WillDelete", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
+
+      assert_raise Ecto.NoResultsError, fn ->
+        ImmuTable.Query.get!(User, TestRepo, v1.entity_id)
+      end
+    end
+
+    test "raises for non-existent entity" do
+      fake_entity_id = UUIDv7.generate()
+
+      assert_raise Ecto.NoResultsError, fn ->
+        ImmuTable.Query.get!(User, TestRepo, fake_entity_id)
+      end
+    end
+
+    test "returns struct for undeleted entity" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_bang_undeleted@test.com", name: "WasDeleted", status: "active"})
+        )
+
+      {:ok, v2} = ImmuTable.delete(TestRepo, v1)
+      {:ok, _v3} = ImmuTable.undelete(TestRepo, v2, %{name: "NowRestored"})
+
+      result = ImmuTable.Query.get!(User, TestRepo, v1.entity_id)
+      assert result.name == "NowRestored"
+      assert result.version == 3
+    end
+
+    test "works via top-level ImmuTable module delegation" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "get_bang_delegate@test.com", name: "BangDelegate", status: "active"})
+        )
+
+      result = ImmuTable.get!(User, TestRepo, v1.entity_id)
+      assert result.name == "BangDelegate"
+    end
+  end
 end

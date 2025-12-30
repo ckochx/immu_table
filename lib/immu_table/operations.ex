@@ -22,26 +22,41 @@ defmodule ImmuTable.Operations do
       ImmuTable.insert(Repo, %Account{name: "Checking"})
       ImmuTable.insert(Repo, Account.changeset(%Account{}, attrs))
   """
-  def insert(repo, struct_or_changeset) do
+  def insert(repo, struct_or_changeset) when is_atom(repo) do
     changeset = prepare_insert_changeset(struct_or_changeset)
 
     repo.insert(changeset)
   end
 
+  def insert(%Ecto.Changeset{} = changeset, repo) when is_atom(repo) do
+    insert(repo, changeset)
+  end
+
   @doc """
   Same as `insert/2` but raises on validation errors.
   """
-  def insert!(repo, struct_or_changeset) do
+  def insert!(repo, struct_or_changeset) when is_atom(repo) do
     changeset = prepare_insert_changeset(struct_or_changeset)
 
     repo.insert!(changeset)
   end
 
+  def insert!(%Ecto.Changeset{} = changeset, repo) when is_atom(repo) do
+    insert!(repo, changeset)
+  end
+
   @doc """
   Creates a new version by inserting a new row with incremented version.
 
-  The previous row remains untouched. Accepts a struct (from a previous query)
-  and either a map of changes or a changeset.
+  The previous row remains untouched. Accepts either:
+  - A struct and changes/changeset: `update(repo, struct, changes)`
+  - Just a changeset (struct extracted from changeset.data): `update(repo, changeset)`
+
+  The 2-arity version enables pipe-friendly syntax:
+
+      user
+      |> User.changeset(params)
+      |> ImmuTable.update(Repo)
 
   Uses advisory locks to prevent concurrent updates from creating duplicate
   version numbers.
@@ -49,6 +64,14 @@ defmodule ImmuTable.Operations do
   Returns `{:error, :not_found}` if entity doesn't exist.
   Returns `{:error, :deleted}` if entity is deleted.
   """
+  def update(repo, %Ecto.Changeset{} = changeset) do
+    update(repo, changeset.data, changeset)
+  end
+
+  def update(%Ecto.Changeset{} = changeset, repo) do
+    update(repo, changeset.data, changeset)
+  end
+
   def update(repo, struct, changes_or_changeset) do
     repo.transaction(fn ->
       ImmuTable.Lock.with_lock(repo, struct.entity_id, fn ->
@@ -75,6 +98,14 @@ defmodule ImmuTable.Operations do
   @doc """
   Same as `update/3` but raises on errors.
   """
+  def update!(repo, %Ecto.Changeset{} = changeset) do
+    update!(repo, changeset.data, changeset)
+  end
+
+  def update!(%Ecto.Changeset{} = changeset, repo) do
+    update!(repo, changeset.data, changeset)
+  end
+
   def update!(repo, struct, changes_or_changeset) do
     case update(repo, struct, changes_or_changeset) do
       {:ok, result} ->

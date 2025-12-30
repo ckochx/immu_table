@@ -250,6 +250,158 @@ defmodule ImmuTable.OperationsTest do
     end
   end
 
+  describe "update/2 (changeset-based)" do
+    alias ImmuTable.Test.User
+
+    test "creates new version from changeset containing struct" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "test@example.com", name: "Test", status: "active"})
+        )
+
+      changeset = User.changeset(v1, %{name: "Updated Name"})
+      {:ok, v2} = ImmuTable.update(TestRepo, changeset)
+
+      assert v2.version == 2
+      assert v2.name == "Updated Name"
+      assert v2.email == "test@example.com"
+      assert v2.entity_id == v1.entity_id
+    end
+
+    test "preserves entity_id from changeset.data" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "entity@example.com", name: "Entity", status: "active"})
+        )
+
+      changeset = User.changeset(v1, %{status: "inactive"})
+      {:ok, v2} = ImmuTable.update(TestRepo, changeset)
+
+      assert v2.entity_id == v1.entity_id
+    end
+
+    test "returns error for invalid changeset" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "invalid@example.com", name: "Invalid", status: "active"})
+        )
+
+      changeset = User.changeset(v1, %{email: "not-an-email"})
+      assert {:error, failed_changeset} = ImmuTable.update(TestRepo, changeset)
+      refute failed_changeset.valid?
+    end
+
+    test "returns error if entity not found" do
+      fake_user = %User{
+        id: UUIDv7.generate(),
+        entity_id: UUIDv7.generate(),
+        version: 1,
+        email: "fake@example.com",
+        name: "Fake"
+      }
+
+      changeset = User.changeset(fake_user, %{name: "New Name"})
+      assert {:error, :not_found} = ImmuTable.update(TestRepo, changeset)
+    end
+
+    test "returns error if entity is deleted" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "deleted@example.com", name: "ToDelete", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
+
+      changeset = User.changeset(v1, %{name: "Should Fail"})
+      assert {:error, :deleted} = ImmuTable.update(TestRepo, changeset)
+    end
+
+    test "enables pipe-friendly syntax" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "pipe@example.com", name: "Pipe", status: "active"})
+        )
+
+      {:ok, v2} =
+        v1
+        |> User.changeset(%{name: "Piped Update"})
+        |> ImmuTable.update(TestRepo)
+
+      assert v2.name == "Piped Update"
+      assert v2.version == 2
+    end
+
+    test "old row remains unchanged" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "old@example.com", name: "Original", status: "active"})
+        )
+
+      changeset = User.changeset(v1, %{name: "Changed"})
+      {:ok, _v2} = ImmuTable.update(TestRepo, changeset)
+
+      old = TestRepo.get(User, v1.id)
+      assert old.name == "Original"
+      assert old.version == 1
+    end
+  end
+
+  describe "update!/2 (changeset-based)" do
+    alias ImmuTable.Test.User
+
+    test "returns struct on success" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "bang@example.com", name: "Bang", status: "active"})
+        )
+
+      v2 =
+        v1
+        |> User.changeset(%{name: "Bang Updated"})
+        |> ImmuTable.update!(TestRepo)
+
+      assert v2.name == "Bang Updated"
+      assert v2.version == 2
+    end
+
+    test "raises on not found" do
+      fake_user = %User{
+        id: UUIDv7.generate(),
+        entity_id: UUIDv7.generate(),
+        version: 1,
+        email: "notfound@example.com",
+        name: "NotFound"
+      }
+
+      assert_raise RuntimeError, fn ->
+        fake_user
+        |> User.changeset(%{name: "Should Raise"})
+        |> ImmuTable.update!(TestRepo)
+      end
+    end
+
+    test "raises on invalid changeset" do
+      {:ok, v1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "raiseinvalid@example.com", name: "RaiseInvalid", status: "active"})
+        )
+
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        v1
+        |> User.changeset(%{email: "bad-email"})
+        |> ImmuTable.update!(TestRepo)
+      end
+    end
+  end
+
   describe "delete/2" do
     test "creates tombstone row with deleted_at set" do
       {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})

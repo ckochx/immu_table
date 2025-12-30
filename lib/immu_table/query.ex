@@ -138,14 +138,7 @@ defmodule ImmuTable.Query do
       end
   """
   def fetch_current(queryable, repo, entity_id) do
-    latest_version =
-      queryable
-      |> where([u], u.entity_id == ^entity_id)
-      |> order_by([u], desc: u.version)
-      |> limit(1)
-      |> repo.one()
-
-    case latest_version do
+    case get_latest_version(queryable, repo, entity_id) do
       nil ->
         {:error, :not_found}
 
@@ -155,6 +148,49 @@ defmodule ImmuTable.Query do
       %{deleted_at: _deleted_at} ->
         {:error, :deleted}
     end
+  end
+
+  @doc """
+  Gets the current version of a specific entity by entity_id.
+
+  Returns `nil` if the entity doesn't exist or is deleted.
+  Use `fetch_current/3` if you need to distinguish between not found and deleted.
+
+  ## Examples
+
+      user = ImmuTable.Query.get(User, Repo, entity_id)
+      if user, do: IO.puts(user.name), else: IO.puts("Not found")
+  """
+  def get(queryable, repo, entity_id) do
+    case fetch_current(queryable, repo, entity_id) do
+      {:ok, record} -> record
+      {:error, _} -> nil
+    end
+  end
+
+  @doc """
+  Gets the current version of a specific entity by entity_id, raising if not found.
+
+  Raises `Ecto.NoResultsError` if the entity doesn't exist or is deleted.
+
+  ## Examples
+
+      user = ImmuTable.Query.get!(User, Repo, entity_id)
+      IO.puts(user.name)
+  """
+  def get!(queryable, repo, entity_id) do
+    case fetch_current(queryable, repo, entity_id) do
+      {:ok, record} -> record
+      {:error, _} -> raise Ecto.NoResultsError, queryable: queryable
+    end
+  end
+
+  defp get_latest_version(queryable, repo, entity_id) do
+    queryable
+    |> where([u], u.entity_id == ^entity_id)
+    |> order_by([u], desc: u.version)
+    |> limit(1)
+    |> repo.one()
   end
 
   # Private helper to get the latest version of each entity
