@@ -1,16 +1,44 @@
 defmodule ImmuTable.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/ck/immu_table"
+
   def project do
     [
       app: :immu_table,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      elixirc_options: [warnings_as_errors: true]
+      elixirc_options: [warnings_as_errors: true],
+      description: description(),
+      package: package(),
+      docs: docs(),
+      name: "ImmuTable",
+      source_url: @source_url
+    ]
+  end
+
+  defp description do
+    "Append-only (immutable) tables with version tracking for Ecto."
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => @source_url},
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md"],
+      source_ref: "v#{@version}"
     ]
   end
 
@@ -37,7 +65,8 @@ defmodule ImmuTable.MixProject do
     [
       {:ecto_sql, "~> 3.10"},
       {:uuidv7, "~> 0.2"},
-      {:postgrex, "~> 0.17", only: [:dev, :test]}
+      {:postgrex, "~> 0.17", only: [:dev, :test]},
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
     ]
   end
 end
