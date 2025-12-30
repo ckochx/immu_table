@@ -65,7 +65,7 @@ defmodule ImmuTable.MixProject do
     [
       {:ecto_sql, "~> 3.10"},
       {:uuidv7, "~> 0.2"},
-      {:postgrex, "~> 0.17", only: [:dev, :test]},
+      {:postgrex, "~> 0.16", only: [:dev, :test]},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false}
     ]
   end

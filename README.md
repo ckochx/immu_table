@@ -14,6 +14,12 @@ def deps do
 end
 ```
 
+### Requirements
+
+- Elixir ~> 1.14
+- Ecto SQL ~> 3.10
+- PostgreSQL (required for advisory locks and UUIDv7)
+
 ## Generators
 
 ImmuTable includes Mix generators to scaffold schemas, contexts, and migrations:

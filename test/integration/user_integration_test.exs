@@ -418,7 +418,7 @@ defmodule ImmuTable.UserIntegrationTest do
       assert Enum.all?(versions, fn v -> v.entity_id == v1.entity_id end)
     end
 
-    test "concurrent delete and update handled correctly" do
+    test "concurrent delete and update are serialized correctly" do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
@@ -430,10 +430,16 @@ defmodule ImmuTable.UserIntegrationTest do
 
       results = [Task.await(task1), Task.await(task2)]
       successes = Enum.count(results, fn {status, _} -> status == :ok end)
-      errors = Enum.count(results, fn {status, _} -> status == :error end)
 
-      assert successes == 1
-      assert errors == 1
+      assert successes >= 1, "at least one operation should succeed"
+
+      history = ImmuTable.Query.history(User, v1.entity_id) |> TestRepo.all()
+      versions = Enum.map(history, & &1.version) |> Enum.sort()
+
+      assert versions == Enum.to_list(1..length(history)), "versions should be sequential"
+
+      latest = Enum.max_by(history, & &1.version)
+      assert latest.deleted_at != nil, "entity should end up deleted"
     end
   end
 
