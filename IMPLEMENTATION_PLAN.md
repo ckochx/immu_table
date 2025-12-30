@@ -91,6 +91,8 @@ All 10 implementation phases are now complete:
 - ✅ Pipe-friendly insert/2 and update/2
 - ✅ Inverse associations (has_many, has_one)
 - ✅ README with comprehensive documentation
+- ✅ Hex package configuration (`mix hex.build`)
+- ✅ ExDoc configuration (`mix docs`)
 
 ### Remaining Work (LOW Priority)
 - Typespecs for public API
