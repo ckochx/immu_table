@@ -14,6 +14,30 @@ def deps do
 end
 ```
 
+## Generators
+
+ImmuTable includes Mix generators to scaffold schemas, contexts, and migrations:
+
+```bash
+# Generate a schema with immutable_schema
+$ mix immutable.gen.schema Blog.Post posts title:string body:text
+
+# Generate a migration with create_immutable_table
+$ mix immutable.gen.migration Blog.Post posts title:string body:text
+
+# Generate context + schema (like phx.gen.context)
+$ mix immutable.gen.context Blog Post posts title:string body:text
+```
+
+The context generator creates a complete context module with all ImmuTable operations:
+- `list_posts/0` - List current records
+- `get_post!/1` and `get_post/1` - Get by entity_id
+- `create_post/1` - Create version 1
+- `update_post/2` - Create new version
+- `delete_post/1` - Create tombstone
+- `undelete_post/1` - Restore from tombstone
+- `get_post_history/1` - Get all versions
+
 ## Quick Start
 
 ### 1. Create a Migration
