@@ -68,7 +68,7 @@ defmodule DemoWeb.TaskLive.Deleted do
      socket
      |> assign(:page_title, "Deleted Tasks")
      |> assign(:has_deleted_tasks, length(deleted_tasks) > 0)
-     |> stream(:tasks, deleted_tasks)}
+     |> stream(:tasks, deleted_tasks, dom_id: &"tasks-#{&1.entity_id}")}
   end
 
   @impl true

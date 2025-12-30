@@ -61,9 +61,6 @@ defmodule DemoWeb.NoteLive.History do
                         <time datetime={version.valid_from}>
                           {format_datetime(version.valid_from)}
                         </time>
-                        <p class="text-xs text-gray-400 font-mono mt-1">
-                          {String.slice(version.id, 0, 8)}...
-                        </p>
                       </div>
                     </div>
                   </div>

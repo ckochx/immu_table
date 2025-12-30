@@ -4,6 +4,7 @@ defmodule ImmuTable.SchemaTest do
   alias ImmuTable.Test.Account
   alias ImmuTable.Test.Post
   alias ImmuTable.Test.Comment
+  alias ImmuTable.Test.DebugSchema
 
   describe "immutable_schema/2" do
     test "injects id field as UUIDv7 primary key" do
@@ -75,6 +76,56 @@ defmodule ImmuTable.SchemaTest do
       refute Account.__immutable__(:allow_updates)
       refute Account.__immutable__(:allow_deletes)
       refute Account.__immutable__(:allow_version_write)
+    end
+
+    test "stores show_row_id option" do
+      refute Account.__immutable__(:show_row_id)
+      assert DebugSchema.__immutable__(:show_row_id)
+    end
+  end
+
+  describe "row id visibility" do
+    test "id is hidden from inspect by default" do
+      account = %Account{
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        entity_id: "660e8400-e29b-41d4-a716-446655440000",
+        name: "Test",
+        balance: Decimal.new("100.00"),
+        version: 1
+      }
+
+      inspected = inspect(account)
+
+      refute inspected =~ "550e8400-e29b-41d4-a716-446655440000"
+      assert inspected =~ "660e8400-e29b-41d4-a716-446655440000"
+      assert inspected =~ "entity_id:"
+      refute inspected =~ ~r/\bid:\s/
+    end
+
+    test "id is visible in inspect when show_row_id: true" do
+      item = %DebugSchema{
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        entity_id: "660e8400-e29b-41d4-a716-446655440000",
+        name: "Debug Item",
+        version: 1
+      }
+
+      inspected = inspect(item)
+
+      assert inspected =~ "550e8400-e29b-41d4-a716-446655440000"
+      assert inspected =~ "id:"
+    end
+
+    test "id field is still accessible even when hidden from inspect" do
+      account = %Account{
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        entity_id: "660e8400-e29b-41d4-a716-446655440000",
+        name: "Test",
+        balance: Decimal.new("100.00"),
+        version: 1
+      }
+
+      assert account.id == "550e8400-e29b-41d4-a716-446655440000"
     end
   end
 end

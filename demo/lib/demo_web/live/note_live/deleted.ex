@@ -68,7 +68,7 @@ defmodule DemoWeb.NoteLive.Deleted do
      socket
      |> assign(:page_title, "Deleted Notes")
      |> assign(:has_deleted_notes, length(deleted_notes) > 0)
-     |> stream(:notes, deleted_notes)}
+     |> stream(:notes, deleted_notes, dom_id: &"notes-#{&1.entity_id}")}
   end
 
   @impl true

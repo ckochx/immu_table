@@ -45,6 +45,17 @@ defmodule ImmuTable do
   - `:allow_updates` - Permit `Repo.update` (default: false, bypasses immutability)
   - `:allow_deletes` - Permit `Repo.delete` (default: false, bypasses immutability)
   - `:allow_version_write` - Allow version in changesets (default: false, prevents forgery)
+  - `:show_row_id` - Show `id` field in `Inspect` output (default: false)
+
+  ## Row ID vs Entity ID
+
+  ImmuTable schemas have two identifiers:
+
+  - `entity_id` - Stable identifier for the logical entity (use this everywhere)
+  - `id` - Row-level primary key that changes with each version (internal use only)
+
+  By default, `id` is hidden from `Inspect` output to avoid confusion. Users should
+  always interact with `entity_id`. Use `show_row_id: true` for debugging.
   """
 
   @doc """

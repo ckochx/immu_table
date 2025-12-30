@@ -40,9 +40,9 @@ defmodule DemoWeb.TaskLive.Index do
         <:action :let={{_id, task}}>
           <.link navigate={~p"/tasks/#{task.entity_id}/edit"}>Edit</.link>
         </:action>
-        <:action :let={{id, task}}>
+        <:action :let={{_id, task}}>
           <.link
-            phx-click={JS.push("delete", value: %{entity_id: task.entity_id}) |> hide("##{id}")}
+            phx-click={JS.push("delete", value: %{entity_id: task.entity_id}) |> hide("#tasks-#{task.entity_id}")}
             data-confirm="Are you sure? This will create a tombstone version."
           >
             Delete
@@ -58,7 +58,7 @@ defmodule DemoWeb.TaskLive.Index do
     {:ok,
      socket
      |> assign(:page_title, "Listing Tasks")
-     |> stream(:tasks, Tasks.list_tasks())}
+     |> stream(:tasks, Tasks.list_tasks(), dom_id: &"tasks-#{&1.entity_id}")}
   end
 
   @impl true

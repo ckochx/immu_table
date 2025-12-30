@@ -26,3 +26,12 @@ defmodule ImmuTable.Test.Comment do
     field(:body, :string)
   end
 end
+
+defmodule ImmuTable.Test.DebugSchema do
+  use Ecto.Schema
+  use ImmuTable, show_row_id: true
+
+  immutable_schema "debug_items" do
+    field(:name, :string)
+  end
+end

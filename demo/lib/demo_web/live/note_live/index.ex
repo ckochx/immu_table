@@ -40,9 +40,9 @@ defmodule DemoWeb.NoteLive.Index do
         <:action :let={{_id, note}}>
           <.link navigate={~p"/notes/#{note.entity_id}/edit"}>Edit</.link>
         </:action>
-        <:action :let={{id, note}}>
+        <:action :let={{_id, note}}>
           <.link
-            phx-click={JS.push("delete", value: %{entity_id: note.entity_id}) |> hide("##{id}")}
+            phx-click={JS.push("delete", value: %{entity_id: note.entity_id}) |> hide("#notes-#{note.entity_id}")}
             data-confirm="Are you sure? This will create a tombstone version."
           >
             Delete
@@ -58,7 +58,7 @@ defmodule DemoWeb.NoteLive.Index do
     {:ok,
      socket
      |> assign(:page_title, "Notes")
-     |> stream(:notes, Notes.list_notes())}
+     |> stream(:notes, Notes.list_notes(), dom_id: &"notes-#{&1.entity_id}")}
   end
 
   @impl true

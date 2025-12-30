@@ -21,6 +21,10 @@ defmodule ImmuTable.Schema do
   """
   defmacro immutable_schema(source, do: block) do
     quote do
+      unless Keyword.get(@immutable_opts, :show_row_id, false) do
+        @derive {Inspect, except: [:id]}
+      end
+
       @primary_key {:id, Ecto.UUID, autogenerate: true}
       @foreign_key_type Ecto.UUID
 
@@ -58,6 +62,7 @@ defmodule ImmuTable.Schema do
           :allow_updates -> Keyword.get(opts, :allow_updates, false)
           :allow_deletes -> Keyword.get(opts, :allow_deletes, false)
           :allow_version_write -> Keyword.get(opts, :allow_version_write, false)
+          :show_row_id -> Keyword.get(opts, :show_row_id, false)
         end
       end
 

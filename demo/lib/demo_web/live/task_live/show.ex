@@ -33,14 +33,10 @@ defmodule DemoWeb.TaskLive.Show do
 
       <div class="mt-8 p-4 bg-gray-50 rounded-lg">
         <h3 class="text-sm font-medium text-gray-500 mb-2">Immutable Metadata</h3>
-        <dl class="grid grid-cols-2 gap-4 text-sm">
+        <dl class="grid grid-cols-3 gap-4 text-sm">
           <div>
             <dt class="text-gray-500">Entity ID</dt>
             <dd class="font-mono text-xs">{@task.entity_id}</dd>
-          </div>
-          <div>
-            <dt class="text-gray-500">Row ID (this version)</dt>
-            <dd class="font-mono text-xs">{@task.id}</dd>
           </div>
           <div>
             <dt class="text-gray-500">Version</dt>

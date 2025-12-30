@@ -17,6 +17,7 @@
 | Phase 9: Association Support | ✅ Complete | Optimized preload from O(N²) to O(1), basic functionality complete |
 | Phase 10: Migration Helpers | ✅ Complete | Macros exist with full integration tests, add_immutable_indexes/1 added |
 | Phase 11: Mix Generators | ✅ Complete | Schema, context, and migration generators with tests |
+| Phase 12: Enhanced Generators | 🔄 In Progress | Phase 12.0 complete; HTML & LiveView generators planned |
 | **Demo App** | ✅ Complete | Phoenix LiveView CRUD app demonstrating all features |
 
 ---
@@ -44,6 +45,223 @@ Features:
 - Migrations use `create_immutable_table` with correct indexes
 - Contexts include all ImmuTable operations (list, get, create, update, delete, undelete, history)
 - References automatically use `entity_id` foreign keys
+
+---
+
+## Phase 12: Enhanced Generators (Planned)
+
+Goal: Align ImmuTable generators with Phoenix conventions and add HTML/LiveView generators.
+
+### Phase 12.0: Suppress Row ID ✅ Complete
+
+The `id` field is a row-level implementation detail that changes with each version. Users should interact with `entity_id` (stable across versions). Previously `id` leaked to users via:
+- `IO.inspect` output and logs
+- Demo app UI (metadata sections)
+- LiveView streams use `id` by default for DOM element IDs
+
+**Design Decision: Hide `id` from Inspect by Default**
+
+| Field | Purpose | User-Facing? |
+|-------|---------|--------------|
+| `id` | Row primary key (changes per version) | No - internal |
+| `entity_id` | Stable entity identifier | Yes - use everywhere |
+
+**Implementation:**
+
+1. **Add `show_row_id` option** (default `false`):
+   ```elixir
+   use ImmuTable, show_row_id: false  # default - hide id from inspect
+   use ImmuTable, show_row_id: true   # for debugging
+   ```
+
+2. **Schema changes** (`lib/immu_table/schema.ex`):
+   - When `show_row_id: false`, inject `@derive {Inspect, except: [:id]}`
+   - Add `__immutable__(:show_row_id)` accessor
+
+3. **Generator templates** use `entity_id` for DOM IDs:
+   ```elixir
+   # In LiveView templates
+   stream(socket, :tasks, tasks, dom_id: fn t -> "task-#{t.entity_id}" end)
+   ```
+
+4. **Demo app cleanup**:
+   - Remove `id` display from Show pages
+   - Remove `id` from History timeline
+   - Update streams to use `entity_id` for DOM IDs
+
+**Why not rename `id` to `_row_id`?**
+- Breaking change for existing users
+- May confuse Ecto internals that expect `:id` primary key
+- Hiding from Inspect achieves the goal without breaking changes
+
+**LiveView Stream Compatibility:**
+
+LiveView's `stream/3` uses `id` by default, but supports `:dom_id` option:
+```elixir
+# Default (uses id)
+stream(socket, :tasks, tasks)
+
+# ImmuTable recommended (uses entity_id)
+stream(socket, :tasks, tasks, dom_id: fn t -> "task-#{t.entity_id}" end)
+```
+
+This keeps `id` available internally while hiding it from users and logs.
+
+---
+
+### Comparison: Current State vs Phoenix
+
+| Feature | ImmuTable | Phoenix |
+|---------|-----------|---------|
+| **Templates** | Embedded in module (`~S"""`) | External files in `priv/templates/` |
+| **Helper Structs** | Custom functions in Generator | `Mix.Phoenix.Schema`, `Mix.Phoenix.Context` structs |
+| **Test Generation** | ❌ None | ✅ Context tests + fixtures |
+| **Template Customization** | ❌ Not supported | ✅ Project-local overrides |
+| **CLI Options** | Minimal | Rich (`--no-migration`, `--binary-id`, etc.) |
+| **HTML Generator** | ❌ Missing | ✅ `phx.gen.html` |
+| **LiveView Generator** | ❌ Missing | ✅ `phx.gen.live` |
+
+### Phase 12.1: Refactor Template System
+
+Move from embedded templates to external files like Phoenix.
+
+**Changes:**
+- Create `priv/templates/immutable.gen.schema/schema.ex`
+- Create `priv/templates/immutable.gen.migration/migration.exs`
+- Create `priv/templates/immutable.gen.context/context.ex`, `schema_access.ex`
+- Update generators to use `Mix.Generator.copy_from/4` with template directories
+- Add fallback to embedded templates for library use (when priv not available)
+
+### Phase 12.2: Create Schema Struct
+
+Structured metadata like `Mix.Phoenix.Schema`.
+
+**Create `lib/mix/immutable/schema.ex`:**
+```elixir
+defstruct [
+  :module, :table, :repo, :singular, :plural,
+  :human_singular, :human_plural, :attrs, :types,
+  :uniques, :migration?, :context_module, :context_alias,
+  # ImmuTable-specific
+  :entity_id_type, :version_field?
+]
+```
+
+### Phase 12.3: Add Test & Fixture Generation
+
+Generate context tests and fixtures like Phoenix.
+
+**Add to `immutable.gen.context`:**
+- `test/<app>/<context>_test.exs` - Context test file
+- `test/support/fixtures/<context>_fixtures.ex` - Test data fixtures
+
+**ImmuTable-specific test cases:**
+- Version creation tests
+- History retrieval tests
+- Soft delete/undelete tests
+
+### Phase 12.4: Add `immutable.gen.html`
+
+Generate controller + HTML views for ImmuTable schemas.
+
+**Files to generate:**
+- `lib/<app>_web/controllers/<resource>_controller.ex`
+- `lib/<app>_web/controllers/<resource>_html.ex`
+- `lib/<app>_web/controllers/<resource>_html/`
+  - `index.html.heex`
+  - `show.html.heex` (with history timeline)
+  - `new.html.heex`
+  - `edit.html.heex`
+  - `<resource>_form.html.heex`
+  - `history.html.heex` (ImmuTable-specific)
+- `test/<app>_web/controllers/<resource>_controller_test.exs`
+
+**ImmuTable-specific features:**
+- History view showing all versions
+- Soft delete with restore option
+- Routes use `entity_id` not `id`
+- "Deleted" badge for tombstoned records
+
+### Phase 12.5: Add `immutable.gen.live`
+
+Generate LiveView modules for ImmuTable schemas.
+
+**Files to generate:**
+- `lib/<app>_web/live/<resource>_live/index.ex`
+- `lib/<app>_web/live/<resource>_live/show.ex` (with history stream)
+- `lib/<app>_web/live/<resource>_live/form.ex`
+- `test/<app>_web/live/<resource>_live_test.exs`
+
+**ImmuTable-specific features:**
+- History timeline component
+- Real-time version updates
+- Soft delete/undelete actions
+- "Show deleted" toggle
+- Point-in-time view option
+
+### Phase 12.6: Add CLI Options
+
+Feature parity with Phoenix options.
+
+**Add options:**
+- `--no-migration` - Skip migration generation
+- `--no-schema` - Skip schema (use existing)
+- `--no-context` - Skip context (use existing)
+- `--no-tests` - Skip test generation
+- `--table NAME` - Custom table name
+- `--context-app APP` - For umbrella apps
+- `--web NAMESPACE` - Web namespace
+
+### Target File Structure
+
+```
+lib/mix/
+├── immutable/
+│   ├── generator.ex        # Utilities (existing, enhanced)
+│   ├── schema.ex           # NEW: Schema struct
+│   └── templates.ex        # Keep for fallback
+└── tasks/
+    ├── immutable.gen.schema.ex      # Existing, refactored
+    ├── immutable.gen.migration.ex   # Existing, refactored
+    ├── immutable.gen.context.ex     # Existing, refactored
+    ├── immutable.gen.html.ex        # NEW
+    └── immutable.gen.live.ex        # NEW
+
+priv/templates/
+├── immutable.gen.schema/
+│   └── schema.ex
+├── immutable.gen.migration/
+│   └── migration.exs
+├── immutable.gen.context/
+│   ├── context.ex
+│   ├── context_test.exs
+│   └── fixtures.ex
+├── immutable.gen.html/
+│   ├── controller.ex
+│   ├── html.ex
+│   ├── index.html.heex
+│   ├── show.html.heex
+│   ├── new.html.heex
+│   ├── edit.html.heex
+│   ├── resource_form.html.heex
+│   ├── history.html.heex
+│   └── controller_test.exs
+└── immutable.gen.live/
+    ├── index.ex
+    ├── show.ex
+    ├── form.ex
+    └── live_test.exs
+```
+
+### Implementation Priority
+
+1. **Phase 12.0** (Suppress Row ID) - Core schema change, prerequisite for generators
+2. **Phase 12.2** (Schema struct) - Foundation for generator changes
+3. **Phase 12.1** (External templates) - Required for customization
+4. **Phase 12.5** (LiveView generator) - High value, builds on demo work
+5. **Phase 12.4** (HTML generator) - Alternative to LiveView
+6. **Phase 12.3** (Test generation) - Quality improvement
+7. **Phase 12.6** (CLI options) - Polish
 
 ---
 
@@ -130,11 +348,11 @@ All 11 implementation phases are now complete:
 - Hardcoded timestamp source
 - Full Ecto integration for associations (cast_assoc, Repo.preload)
 
-### Future Enhancement (LOW Priority)
-- **LiveView Generator**: `mix immutable.gen.live` - Like `phx.gen.live` but with ImmuTable-aware templates
-  - Should handle `entity_id` in routes, LiveView params, and templates
-  - History view component
-  - Tombstone/restore UI
+### Future Enhancement
+- **Phase 12: Enhanced Generators** - See detailed plan above
+  - HTML and LiveView generators with ImmuTable-aware templates
+  - External template system with customization support
+  - Test and fixture generation
 
 ---
 
