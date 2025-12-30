@@ -99,6 +99,14 @@ All 10 implementation phases are now complete:
 - Hardcoded timestamp source
 - Full Ecto integration for associations (cast_assoc, Repo.preload)
 
+### Future Enhancement (MEDIUM Priority)
+- **Phoenix Generator Hooks**: Create generator tasks that emit ImmuTable-compatible code:
+  - `mix immu.gen.live` - Like `phx.gen.live` but with immutable schema, migration, and context
+  - `mix immu.gen.html` - Like `phx.gen.html` but with ImmuTable setup
+  - `mix immu.gen.context` - Generate context with ImmuTable operations
+  - `mix immu.gen.schema` - Generate schema with `immutable_schema` and proper changeset
+  - Should handle `entity_id` in routes, LiveView params, and templates
+
 ---
 
 ## Known Limitation: Direct Ecto.Changeset Usage
