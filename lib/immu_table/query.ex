@@ -14,6 +14,38 @@ defmodule ImmuTable.Query do
   This is the most commonly used query helper. It returns only the latest
   version of each entity where `deleted_at IS NULL`.
 
+  ## Important: Binding Behavior with Joins
+
+  This function internally creates a join to filter for the latest version,
+  which introduces an additional binding. When composing with your own joins
+  using positional bindings (e.g., `[p, c]`), the binding indices may not
+  resolve as expected.
+
+  **Recommended approaches when joining with other tables:**
+
+  1. Use `current/2` with named bindings (recommended):
+
+          User
+          |> ImmuTable.Query.current(as: :user)
+          |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+          |> where([user: u, client: c], ilike(c.first_name, ^pattern))
+          |> Repo.all()
+
+  2. Use `get_current_subquery/1` for simple positional bindings:
+
+          from(u in ImmuTable.Query.get_current_subquery(User))
+          |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
+          |> where([u, c], ilike(c.first_name, ^pattern))
+          |> Repo.all()
+
+  3. Account for the internal binding if using this function directly:
+
+          User
+          |> ImmuTable.Query.get_current()
+          |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
+          |> where([u, _internal, c], ilike(c.first_name, ^pattern))
+          |> Repo.all()
+
   ## Examples
 
       User
@@ -24,11 +56,103 @@ defmodule ImmuTable.Query do
       |> ImmuTable.Query.get_current()
       |> where([u], u.status == "active")
       |> Repo.all()
+
+  ## See Also
+
+  - `get_current_subquery/1` - Wraps in subquery for predictable bindings
+  - `current/2` - Returns query with named binding for easy composition
   """
   def get_current(queryable) do
     queryable
     |> subquery_latest_versions()
     |> where([u], is_nil(u.deleted_at))
+  end
+
+  @doc """
+  Returns a subquery for the current (latest non-deleted) version of each entity.
+
+  Unlike `get_current/1`, this function wraps the result in a subquery, which
+  isolates the internal query structure and provides predictable binding behavior
+  when composing with additional joins.
+
+  Use this function when you need to join ImmuTable-managed entities with other
+  tables using positional bindings.
+
+  ## Why This Exists
+
+  `get_current/1` internally creates a join to filter for the latest version,
+  which introduces an extra binding. When you add your own joins afterwards,
+  positional bindings like `[p, c]` may not resolve as expected because the
+  internal binding is counted.
+
+  `get_current_subquery/1` wraps everything in a subquery, so subsequent joins
+  work with simple positional bindings.
+
+  ## Examples
+
+      # This works with simple positional bindings:
+      User
+      |> ImmuTable.Query.get_current_subquery()
+      |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
+      |> where([u, c], ilike(c.first_name, ^pattern))
+      |> Repo.all()
+
+      # Wrap in from() if you want to add a named binding:
+      from(u in ImmuTable.Query.get_current_subquery(User), as: :user)
+      |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+      |> where([user: u, client: c], ilike(c.first_name, ^pattern))
+      |> Repo.all()
+
+  ## See Also
+
+  - `get_current/1` - Returns the query without wrapping (use with named bindings)
+  - `current/2` - Convenience function that returns a named-binding query
+  """
+  def get_current_subquery(queryable) do
+    queryable
+    |> get_current()
+    |> subquery()
+  end
+
+  @doc """
+  Returns a query for the current (latest non-deleted) version of each entity
+  with a named binding for easier composition with joins.
+
+  This is a convenience function that wraps `get_current/1` in a subquery and
+  assigns it a named binding. This makes it easy to compose queries with
+  additional joins without worrying about positional binding indices.
+
+  ## Options
+
+  - `:as` - The name for the binding (default: `:current`)
+
+  ## Examples
+
+      # Using the default :current binding:
+      User
+      |> ImmuTable.Query.current()
+      |> join(:left, [current: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+      |> where([current: u, client: c], ilike(c.first_name, ^pattern))
+      |> select([current: u, client: c], {u.name, c.first_name})
+      |> Repo.all()
+
+      # Using a custom binding name:
+      User
+      |> ImmuTable.Query.current(as: :user)
+      |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+      |> where([user: u, client: c], ilike(c.first_name, ^pattern))
+      |> Repo.all()
+
+  ## Why Named Bindings?
+
+  Named bindings make your queries more readable and maintainable:
+  - They're self-documenting
+  - Order doesn't matter when referencing bindings
+  - Adding or removing joins doesn't break existing references
+  """
+  def current(queryable, opts \\ []) do
+    name = Keyword.get(opts, :as, :current)
+    from(r in get_current_subquery(queryable), as: ^name)
   end
 
   @doc """

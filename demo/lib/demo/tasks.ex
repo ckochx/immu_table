@@ -6,8 +6,11 @@ defmodule Demo.Tasks do
   All changes create new versions rather than modifying existing rows.
   """
 
+  import Ecto.Query
+
   alias Demo.Repo
   alias Demo.Tasks.Task
+  alias Demo.Tasks.Assignee
 
   @doc """
   Returns the list of current (non-deleted) tasks.
@@ -31,8 +34,6 @@ defmodule Demo.Tasks do
   Returns only deleted (tombstoned) tasks.
   """
   def list_deleted_tasks do
-    import Ecto.Query
-
     Task
     |> ImmuTable.Query.include_deleted()
     |> where([t], not is_nil(t.deleted_at))
@@ -113,5 +114,71 @@ defmodule Demo.Tasks do
   """
   def change_task(%Task{} = task, attrs \\ %{}) do
     Task.changeset(task, attrs)
+  end
+
+  @doc """
+  Searches tasks by assignee name.
+
+  This demonstrates ImmuTable.Query.current/2 with named bindings for
+  joining ImmuTable-managed entities with regular Ecto schemas.
+
+  Uses named bindings which makes the query readable and maintainable:
+  - [task: t] refers to the task
+  - [assignee: a] refers to the assignee
+  """
+  def search_tasks_by_assignee(name_pattern) do
+    pattern = "%#{name_pattern}%"
+
+    Task
+    |> ImmuTable.Query.current(as: :task)
+    |> join(:inner, [task: t], a in Assignee, on: t.entity_id == a.task_entity_id, as: :assignee)
+    |> where([task: t, assignee: a], ilike(a.name, ^pattern))
+    |> select([task: t, assignee: a], %{task: t, assignee_name: a.name})
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists all tasks with their assignees (if any).
+
+  Demonstrates a left join where tasks may or may not have assignees.
+  """
+  def list_tasks_with_assignees do
+    Task
+    |> ImmuTable.Query.current(as: :task)
+    |> join(:left, [task: t], a in Assignee, on: t.entity_id == a.task_entity_id, as: :assignee)
+    |> select([task: t, assignee: a], %{task: t, assignee: a})
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets all assignees for a task.
+  """
+  def list_assignees_for_task(task_entity_id) do
+    Assignee
+    |> where([a], a.task_entity_id == ^task_entity_id)
+    |> Repo.all()
+  end
+
+  @doc """
+  Creates an assignee for a task.
+  """
+  def create_assignee(attrs) do
+    %Assignee{}
+    |> Assignee.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Deletes an assignee.
+  """
+  def delete_assignee(%Assignee{} = assignee) do
+    Repo.delete(assignee)
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking assignee changes.
+  """
+  def change_assignee(%Assignee{} = assignee, attrs \\ %{}) do
+    Assignee.changeset(assignee, attrs)
   end
 end

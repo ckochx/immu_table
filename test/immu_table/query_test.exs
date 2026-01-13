@@ -3,6 +3,7 @@ defmodule ImmuTable.QueryTest do
 
   import Ecto.Query
   alias ImmuTable.Test.User
+  alias ImmuTable.Test.Client
   alias ImmuTable.TestRepo
 
   describe "current/1" do
@@ -729,6 +730,195 @@ defmodule ImmuTable.QueryTest do
 
       result = ImmuTable.get!(User, TestRepo, v1.entity_id)
       assert result.name == "BangDelegate"
+    end
+  end
+
+  describe "get_current_subquery/1" do
+    test "returns a subquery that can be joined with predictable bindings" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "subquery_test@test.com", name: "SubqueryTest", status: "active"})
+        )
+
+      {:ok, _client} =
+        TestRepo.insert(%Client{
+          user_entity_id: user.entity_id,
+          first_name: "John",
+          last_name: "Doe"
+        })
+
+      subquery = ImmuTable.Query.get_current_subquery(User)
+
+      results =
+        from(u in subquery)
+        |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
+        |> where([u, c], ilike(c.first_name, "John%"))
+        |> select([u, c], {u.name, c.first_name})
+        |> TestRepo.all()
+
+      assert results == [{"SubqueryTest", "John"}]
+    end
+
+    test "returns only current non-deleted versions" do
+      {:ok, user1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "subquery_v1@test.com", name: "Original", status: "active"})
+        )
+
+      {:ok, _user1_v2} = ImmuTable.update(TestRepo, user1, %{name: "Updated"})
+
+      {:ok, user2} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "subquery_deleted@test.com", name: "Deleted", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, user2)
+
+      results =
+        User
+        |> ImmuTable.Query.get_current_subquery()
+        |> TestRepo.all()
+        |> Enum.sort_by(& &1.email)
+
+      assert length(results) == 1
+      assert hd(results).name == "Updated"
+    end
+
+    test "composes with other Ecto query operations" do
+      {:ok, _user1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "subquery_compose1@test.com", name: "Active", status: "active"})
+        )
+
+      {:ok, _user2} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "subquery_compose2@test.com", name: "Inactive", status: "inactive"})
+        )
+
+      results =
+        User
+        |> ImmuTable.Query.get_current_subquery()
+        |> where([u], u.status == "active")
+        |> TestRepo.all()
+
+      assert length(results) == 1
+      assert hd(results).name == "Active"
+    end
+  end
+
+  describe "current/2 with named bindings" do
+    test "creates a query with the default :current binding" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "named_default@test.com", name: "NamedDefault", status: "active"})
+        )
+
+      {:ok, _client} =
+        TestRepo.insert(%Client{
+          user_entity_id: user.entity_id,
+          first_name: "Jane",
+          last_name: "Smith"
+        })
+
+      results =
+        User
+        |> ImmuTable.Query.current()
+        |> join(:left, [current: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+        |> where([current: u, client: c], ilike(c.first_name, "Jane%"))
+        |> select([current: u, client: c], {u.name, c.first_name})
+        |> TestRepo.all()
+
+      assert results == [{"NamedDefault", "Jane"}]
+    end
+
+    test "creates a query with a custom named binding" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "named_custom@test.com", name: "NamedCustom", status: "active"})
+        )
+
+      {:ok, _client} =
+        TestRepo.insert(%Client{
+          user_entity_id: user.entity_id,
+          first_name: "Bob",
+          last_name: "Jones"
+        })
+
+      results =
+        User
+        |> ImmuTable.Query.current(as: :user)
+        |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+        |> where([user: u, client: c], ilike(c.first_name, "Bob%"))
+        |> select([user: u, client: c], {u.name, c.first_name})
+        |> TestRepo.all()
+
+      assert results == [{"NamedCustom", "Bob"}]
+    end
+
+    test "returns only current non-deleted versions" do
+      {:ok, user1} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "named_v1@test.com", name: "Original", status: "active"})
+        )
+
+      {:ok, _user1_v2} = ImmuTable.update(TestRepo, user1, %{name: "Updated"})
+
+      {:ok, user2} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "named_deleted@test.com", name: "Deleted", status: "active"})
+        )
+
+      {:ok, _deleted} = ImmuTable.delete(TestRepo, user2)
+
+      results =
+        User
+        |> ImmuTable.Query.current(as: :user)
+        |> where([user: u], u.email == "named_v1@test.com")
+        |> TestRepo.all()
+
+      assert length(results) == 1
+      assert hd(results).name == "Updated"
+    end
+
+    test "allows chaining multiple joins with named bindings" do
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{email: "multi_join@test.com", name: "MultiJoin", status: "active"})
+        )
+
+      {:ok, client1} =
+        TestRepo.insert(%Client{
+          user_entity_id: user.entity_id,
+          first_name: "First",
+          last_name: "Client"
+        })
+
+      {:ok, _client2} =
+        TestRepo.insert(%Client{
+          user_entity_id: user.entity_id,
+          first_name: "Second",
+          last_name: "Client"
+        })
+
+      results =
+        User
+        |> ImmuTable.Query.current(as: :user)
+        |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+        |> where([client: c], c.id == ^client1.id)
+        |> select([user: u, client: c], {u.name, c.first_name})
+        |> TestRepo.all()
+
+      assert results == [{"MultiJoin", "First"}]
     end
   end
 end
