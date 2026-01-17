@@ -1,6 +1,6 @@
 defmodule ImmuTable.Lock do
   @moduledoc """
-  PostgreSQL advisory locks for serializing concurrent operations.
+  Advisory locks for serializing concurrent operations.
 
   ## Why Advisory Locks?
 
@@ -11,17 +11,26 @@ defmodule ImmuTable.Lock do
   Advisory locks serialize access per entity_id, ensuring version increments
   are atomic even across separate transactions.
 
-  ## Why pg_advisory_xact_lock?
+  ## Database Support
 
-  Transaction-level locks (`pg_advisory_xact_lock`) automatically release when
-  the transaction ends, preventing lock leaks from application crashes.
+  - **PostgreSQL**: Uses `pg_advisory_xact_lock` for per-entity serialization.
+    Transaction-level locks automatically release when the transaction ends,
+    preventing lock leaks from application crashes.
+
+  - **SQLite**: No-op. SQLite is inherently single-writer at the database level,
+    so concurrent write serialization happens automatically. This is sufficient
+    for development, demos, and low-concurrency production use cases.
+
+  For high-concurrency production environments, PostgreSQL is recommended.
   """
 
   @doc """
   Executes function with an advisory lock on the given entity_id.
 
-  Converts UUID to int64 via SHA-256 hash for PostgreSQL's advisory lock API.
+  For PostgreSQL, converts UUID to int64 via SHA-256 hash for the advisory lock API.
   Lock is held until the enclosing transaction commits or rolls back.
+
+  For SQLite and other adapters, executes the function without locking (no-op).
 
   ## Example
 
@@ -30,14 +39,16 @@ defmodule ImmuTable.Lock do
       end)
   """
   def with_lock(repo, entity_id, fun) do
-    lock_key = uuid_to_lock_key(entity_id)
+    if postgres?(repo) do
+      lock_key = uuid_to_lock_key(entity_id)
+      repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
+    end
 
-    query = """
-    SELECT pg_advisory_xact_lock($1)
-    """
-
-    repo.query!(query, [lock_key])
     fun.()
+  end
+
+  defp postgres?(repo) do
+    repo.__adapter__() == Ecto.Adapters.Postgres
   end
 
   defp uuid_to_lock_key(uuid) when is_binary(uuid) do

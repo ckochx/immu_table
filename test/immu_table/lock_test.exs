@@ -3,6 +3,36 @@ defmodule ImmuTable.LockTest do
 
   alias ImmuTable.Lock
 
+  defmodule FakeSQLiteRepo do
+    def __adapter__, do: Ecto.Adapters.SQLite3
+  end
+
+  describe "with_lock/3 adapter detection" do
+    test "skips advisory lock for non-PostgreSQL adapters (SQLite)" do
+      entity_id = UUIDv7.generate()
+
+      result =
+        Lock.with_lock(FakeSQLiteRepo, entity_id, fn ->
+          :sqlite_operation_completed
+        end)
+
+      assert result == :sqlite_operation_completed
+    end
+
+    test "executes advisory lock for PostgreSQL adapter" do
+      assert TestRepo.__adapter__() == Ecto.Adapters.Postgres
+
+      entity_id = UUIDv7.generate()
+
+      result =
+        Lock.with_lock(TestRepo, entity_id, fn ->
+          :postgres_operation_completed
+        end)
+
+      assert result == :postgres_operation_completed
+    end
+  end
+
   describe "with_lock/3" do
     test "acquires and releases advisory lock" do
       entity_id = UUIDv7.generate()

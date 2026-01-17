@@ -19,6 +19,7 @@
 | Phase 11: Mix Generators | ✅ Complete | Schema, context, and migration generators with tests |
 | Phase 12: Enhanced Generators | 🔄 In Progress | Phase 12.0 complete; HTML & LiveView generators planned |
 | Phase 13: Repo Function Parity | 📋 Planned | Missing functions identified; see detailed analysis below |
+| Phase 14: SQLite Compatibility | ✅ Complete | Advisory lock is no-op for SQLite; PG uses full locking |
 | **Demo App** | ✅ Complete | Phoenix LiveView CRUD app demonstrating all features |
 
 ---
@@ -600,6 +601,88 @@ def changeset(struct, params) do
   |> validate_required([:name])
 end
 ```
+
+---
+
+## Phase 14: SQLite Compatibility (In Progress)
+
+**Goal**: Allow ImmuTable to work with SQLite for development/demo environments.
+
+**Status**: ✅ Complete (v0.5.2)
+
+### The Problem
+
+ImmuTable uses PostgreSQL advisory locks (`pg_advisory_xact_lock`) in `lib/immu_table/lock.ex` to serialize concurrent writes to the same `entity_id`. This ensures monotonic version numbers when multiple processes try to update the same entity simultaneously.
+
+SQLite doesn't have this function, causing errors like:
+```
+** (Exqlite.Error) no such function: pg_advisory_xact_lock
+```
+
+### Why Advisory Locks Exist
+
+Without locking, concurrent updates to the same entity could:
+1. Both read version N
+2. Both try to insert version N+1
+3. Create duplicate versions or constraint violations
+
+The advisory lock serializes access per `entity_id`, ensuring only one process can read-compute-insert at a time for a given entity.
+
+### Key Finding
+
+There's **no unique constraint on `(entity_id, version)`** in the migration. The advisory lock is the *only* mechanism preventing duplicate versions.
+
+### Compatibility Options Considered
+
+| Option | Approach | Pros | Cons | Complexity |
+|--------|----------|------|------|------------|
+| **1. Unique Constraint + Retry** | Add `unique_index([:entity_id, :version])`, catch violations, retry | Database-agnostic, works for both PG & SQLite | Schema change, retry logic complexity | Medium |
+| **2. Database Adapter Pattern** | Create behaviour with PG/SQLite implementations | Clean architecture, optimal per-database | More code to maintain | Medium-High |
+| **3. Accept Single-Writer** ✅ | No-op lock for SQLite, rely on SQLite's single-writer model | Trivial to implement, SQLite is single-writer anyway | No per-entity parallelism | **Low** |
+| **4. Application-Level Locking** | GenServer/ETS for per-entity locks | Full control | Doesn't work across nodes, lost on restart | High |
+
+### Chosen Solution: Option 3
+
+**Rationale**: SQLite is inherently single-writer at the database level. The per-entity granularity of PostgreSQL advisory locks is an optimization that doesn't map well to SQLite's architecture. For typical SQLite use cases (development, demos, embedded, low-traffic), database-level serialization is sufficient.
+
+**Implementation**:
+1. Detect database adapter in `ImmuTable.Lock.with_lock/3`
+2. For PostgreSQL: Use `pg_advisory_xact_lock` (current behavior)
+3. For SQLite (and other adapters): No-op, just execute the function
+
+```elixir
+def with_lock(repo, entity_id, fun) do
+  if postgres?(repo) do
+    lock_key = uuid_to_lock_key(entity_id)
+    repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
+  end
+  fun.()
+end
+
+defp postgres?(repo) do
+  repo.__adapter__() == Ecto.Adapters.Postgres
+end
+```
+
+### Future Improvements (If Needed)
+
+If SQLite users report concurrency issues:
+1. Add `unique_index([:entity_id, :version])` to migrations (safety net for all databases)
+2. Add retry logic for constraint violations on SQLite
+3. Document that PostgreSQL is recommended for high-concurrency production use
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `lib/immu_table/lock.ex` | Add adapter detection, no-op for non-PostgreSQL |
+
+### Documentation Notes
+
+Add to README:
+- ImmuTable is optimized for PostgreSQL
+- SQLite is supported for development/demos but lacks per-entity concurrency control
+- For production with concurrent writes, PostgreSQL is recommended
 
 ---
 
