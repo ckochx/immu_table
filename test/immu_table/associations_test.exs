@@ -1,36 +1,9 @@
 defmodule ImmuTable.AssociationsTest do
   use ImmuTable.DataCase, async: true
 
-  defmodule Project do
-    use ImmuTable
-
-    immutable_schema "projects" do
-      field(:title, :string)
-      field(:description, :string)
-
-      immutable_belongs_to(:organization, ImmuTable.AssociationsTest.Organization)
-      immutable_has_one(:lead_developer, ImmuTable.AssociationsTest.Developer, foreign_key: :project_entity_id)
-    end
-  end
-
-  defmodule Organization do
-    use ImmuTable
-
-    immutable_schema "organizations" do
-      field(:name, :string)
-
-      immutable_has_many(:projects, ImmuTable.AssociationsTest.Project, foreign_key: :organization_entity_id)
-    end
-  end
-
-  defmodule Developer do
-    use ImmuTable
-
-    immutable_schema "developers" do
-      field(:name, :string)
-      field(:project_entity_id, Ecto.UUID)
-    end
-  end
+  alias ImmuTable.Test.Project
+  alias ImmuTable.Test.Organization
+  alias ImmuTable.Test.Developer
 
   describe "immutable_belongs_to/3 macro" do
     test "creates {field}_entity_id field" do
