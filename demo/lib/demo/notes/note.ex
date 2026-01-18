@@ -1,5 +1,4 @@
 defmodule Demo.Notes.Note do
-  use Ecto.Schema
   use ImmuTable
 
   import Ecto.Changeset, except: [cast: 3]

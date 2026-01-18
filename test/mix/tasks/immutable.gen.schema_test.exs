@@ -19,8 +19,8 @@ defmodule Mix.Tasks.Immutable.Gen.SchemaTest do
 
         assert_file("lib/my_app/blog/post.ex", fn content ->
           assert content =~ "defmodule MyApp.Blog.Post do"
-          assert content =~ "use Ecto.Schema"
           assert content =~ "use ImmuTable"
+          refute content =~ "use Ecto.Schema"
           assert content =~ "import Ecto.Changeset, except: [cast: 3]"
           assert content =~ "immutable_schema \"posts\" do"
           assert content =~ "field :title, :string"

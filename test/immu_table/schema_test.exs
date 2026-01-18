@@ -6,6 +6,15 @@ defmodule ImmuTable.SchemaTest do
   alias ImmuTable.Test.Comment
   alias ImmuTable.Test.DebugSchema
 
+  describe "use ImmuTable" do
+    test "includes Ecto.Schema functionality" do
+      assert function_exported?(Account, :__schema__, 1)
+      assert function_exported?(Account, :__schema__, 2)
+      assert function_exported?(Account, :__struct__, 0)
+      assert function_exported?(Account, :__struct__, 1)
+    end
+  end
+
   describe "immutable_schema/2" do
     test "injects id field as UUIDv7 primary key" do
       assert Account.__schema__(:type, :id) == Ecto.UUID

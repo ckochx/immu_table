@@ -4,7 +4,6 @@ defmodule Mix.Immutable.Templates do
   def schema_template do
     ~S"""
 defmodule <%= schema_module %> do
-  use Ecto.Schema
   use ImmuTable
 
   import Ecto.Changeset, except: [cast: 3]

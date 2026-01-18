@@ -2,7 +2,6 @@ defmodule ImmuTable.AssociationsTest do
   use ImmuTable.DataCase, async: true
 
   defmodule Project do
-    use Ecto.Schema
     use ImmuTable
 
     immutable_schema "projects" do
@@ -15,7 +14,6 @@ defmodule ImmuTable.AssociationsTest do
   end
 
   defmodule Organization do
-    use Ecto.Schema
     use ImmuTable
 
     immutable_schema "organizations" do
@@ -26,7 +24,6 @@ defmodule ImmuTable.AssociationsTest do
   end
 
   defmodule Developer do
-    use Ecto.Schema
     use ImmuTable
 
     immutable_schema "developers" do

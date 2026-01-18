@@ -5,7 +5,6 @@ defmodule ImmuTable.Test.User do
   This schema represents a user account with typical fields
   and uses ImmuTable for immutable, versioned storage.
   """
-  use Ecto.Schema
   use ImmuTable
 
   import Ecto.Changeset, except: [cast: 3]

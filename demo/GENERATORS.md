@@ -66,7 +66,6 @@ schema "tasks" do
 end
 
 # After (ImmuTable)
-use Ecto.Schema
 use ImmuTable
 import Ecto.Changeset, except: [cast: 3]
 

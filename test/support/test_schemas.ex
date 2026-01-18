@@ -1,5 +1,4 @@
 defmodule ImmuTable.Test.Account do
-  use Ecto.Schema
   use ImmuTable
 
   immutable_schema "accounts" do
@@ -9,7 +8,6 @@ defmodule ImmuTable.Test.Account do
 end
 
 defmodule ImmuTable.Test.Post do
-  use Ecto.Schema
   use ImmuTable, allow_version_write: true
 
   immutable_schema "posts" do
@@ -19,7 +17,6 @@ defmodule ImmuTable.Test.Post do
 end
 
 defmodule ImmuTable.Test.Comment do
-  use Ecto.Schema
   use ImmuTable, allow_updates: true, allow_deletes: true
 
   immutable_schema "comments" do
@@ -28,7 +25,6 @@ defmodule ImmuTable.Test.Comment do
 end
 
 defmodule ImmuTable.Test.DebugSchema do
-  use Ecto.Schema
   use ImmuTable, show_row_id: true
 
   immutable_schema "debug_items" do

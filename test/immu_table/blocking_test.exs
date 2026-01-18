@@ -80,7 +80,6 @@ defmodule ImmuTable.BlockingTest do
       A schema with a custom changeset that uses the module's cast function
       (which includes blocking automatically).
       """
-      use Ecto.Schema
       use ImmuTable
 
       immutable_schema "unsafe_schemas" do
@@ -100,7 +99,6 @@ defmodule ImmuTable.BlockingTest do
       A schema with a custom changeset that uses the module's change function
       (which includes blocking automatically).
       """
-      use Ecto.Schema
       use ImmuTable
 
       immutable_schema "unsafe_schemas" do
@@ -163,7 +161,6 @@ defmodule ImmuTable.BlockingTest do
 
       Users MUST use the module's cast/3 or change/2 functions to get blocking.
       """
-      use Ecto.Schema
       use ImmuTable
 
       immutable_schema "unsafe_schemas" do
@@ -191,7 +188,6 @@ defmodule ImmuTable.BlockingTest do
 
   describe "mixed allow_updates and allow_deletes settings" do
     defmodule UpdateOnly do
-      use Ecto.Schema
       use ImmuTable, allow_updates: true
 
       immutable_schema "update_only" do
@@ -200,7 +196,6 @@ defmodule ImmuTable.BlockingTest do
     end
 
     defmodule DeleteOnly do
-      use Ecto.Schema
       use ImmuTable, allow_deletes: true
 
       immutable_schema "delete_only" do

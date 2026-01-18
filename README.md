@@ -76,7 +76,6 @@ This creates a table with these additional columns:
 
 ```elixir
 defmodule MyApp.Tasks.Task do
-  use Ecto.Schema
   use ImmuTable
 
   import Ecto.Changeset, except: [cast: 3]
@@ -96,7 +95,7 @@ end
 ```
 
 Key differences from standard Ecto schemas:
-- `use ImmuTable` - enables immutable table macros
+- `use ImmuTable` - enables immutable table macros and includes `Ecto.Schema`
 - `import Ecto.Changeset, except: [cast: 3]` - use ImmuTable's cast which filters protected fields
 - `immutable_schema` instead of `schema` - injects metadata fields automatically
 - No `timestamps()` - ImmuTable uses `valid_from` instead

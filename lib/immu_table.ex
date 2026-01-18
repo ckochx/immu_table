@@ -11,7 +11,6 @@ defmodule ImmuTable do
   ## Usage
 
       defmodule MyApp.Account do
-        use Ecto.Schema
         use ImmuTable
 
         immutable_schema "accounts" do
@@ -66,6 +65,7 @@ defmodule ImmuTable do
   """
   defmacro __using__(opts) do
     quote do
+      use Ecto.Schema
       import ImmuTable.Schema
       import ImmuTable.Associations
 
