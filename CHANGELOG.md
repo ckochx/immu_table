@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-01-18
+
 ### Changed
 
 - `use ImmuTable` now automatically includes `use Ecto.Schema`, simplifying schema definitions
@@ -56,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advisory locks for optimistic concurrency control
 - Changeset filtering for protected fields
 
-[Unreleased]: https://github.com/ckochx/immu_table/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/ckochx/immu_table/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/ckochx/immu_table/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ckochx/immu_table/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ckochx/immu_table/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ckochx/immu_table/compare/v0.1.0...v0.5.0
