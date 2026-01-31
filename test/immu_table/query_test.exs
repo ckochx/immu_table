@@ -224,6 +224,11 @@ defmodule ImmuTable.QueryTest do
       assert hd(results_v1).version == 1
       assert hd(results_v1).name == "Nancy"
 
+      # During v1 Repo.one
+      results_v1 = User |> ImmuTable.Query.at_time(after_v1) |> TestRepo.one()
+      assert results_v1.version == 1
+      assert results_v1.name == "Nancy"
+
       # During v2
       results_v2 = User |> ImmuTable.Query.at_time(after_v2) |> TestRepo.all()
       assert length(results_v2) == 1
