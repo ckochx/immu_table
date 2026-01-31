@@ -30,6 +30,7 @@ defmodule ImmuTable.QueryTest do
           TestRepo,
           User.changeset(%User{}, %{email: "bob@test.com", name: "Bob", status: "active"})
         )
+
       {:ok, _user1_v2} = ImmuTable.update(TestRepo, v1, %{name: "Bob Updated"})
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
@@ -71,7 +72,8 @@ defmodule ImmuTable.QueryTest do
 
       {:ok, _user1_v2} = ImmuTable.update(TestRepo, user1, %{name: "Dave Updated"})
 
-      results = User |> ImmuTable.Query.get_current() |> TestRepo.all() |> Enum.sort_by(& &1.email)
+      results =
+        User |> ImmuTable.Query.get_current() |> TestRepo.all() |> Enum.sort_by(& &1.email)
 
       assert length(results) == 2
       assert Enum.at(results, 0).name == "Dave Updated"
@@ -291,7 +293,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "boundary@test.com", name: "Boundary", status: "active"})
+          User.changeset(%User{}, %{
+            email: "boundary@test.com",
+            name: "Boundary",
+            status: "active"
+          })
         )
 
       # Query at the exact moment the entity was created
@@ -362,7 +368,12 @@ defmodule ImmuTable.QueryTest do
       {:ok, v2} = ImmuTable.update(TestRepo, v1, %{name: "V2"})
 
       # Timestamp halfway between v1 and v2
-      halfway = DateTime.add(v1.valid_from, div(DateTime.diff(v2.valid_from, v1.valid_from, :microsecond), 2), :microsecond)
+      halfway =
+        DateTime.add(
+          v1.valid_from,
+          div(DateTime.diff(v2.valid_from, v1.valid_from, :microsecond), 2),
+          :microsecond
+        )
 
       results = User |> ImmuTable.Query.at_time(halfway) |> TestRepo.all()
 
@@ -634,7 +645,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "get_deleted@test.com", name: "Deleted", status: "active"})
+          User.changeset(%User{}, %{
+            email: "get_deleted@test.com",
+            name: "Deleted",
+            status: "active"
+          })
         )
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
@@ -651,7 +666,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "get_undeleted@test.com", name: "Undeleted", status: "active"})
+          User.changeset(%User{}, %{
+            email: "get_undeleted@test.com",
+            name: "Undeleted",
+            status: "active"
+          })
         )
 
       {:ok, v2} = ImmuTable.delete(TestRepo, v1)
@@ -666,7 +685,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "get_delegate@test.com", name: "Delegate", status: "active"})
+          User.changeset(%User{}, %{
+            email: "get_delegate@test.com",
+            name: "Delegate",
+            status: "active"
+          })
         )
 
       result = ImmuTable.get(User, TestRepo, v1.entity_id)
@@ -693,7 +716,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "get_bang_deleted@test.com", name: "WillDelete", status: "active"})
+          User.changeset(%User{}, %{
+            email: "get_bang_deleted@test.com",
+            name: "WillDelete",
+            status: "active"
+          })
         )
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
@@ -715,7 +742,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "get_bang_undeleted@test.com", name: "WasDeleted", status: "active"})
+          User.changeset(%User{}, %{
+            email: "get_bang_undeleted@test.com",
+            name: "WasDeleted",
+            status: "active"
+          })
         )
 
       {:ok, v2} = ImmuTable.delete(TestRepo, v1)
@@ -730,7 +761,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "get_bang_delegate@test.com", name: "BangDelegate", status: "active"})
+          User.changeset(%User{}, %{
+            email: "get_bang_delegate@test.com",
+            name: "BangDelegate",
+            status: "active"
+          })
         )
 
       result = ImmuTable.get!(User, TestRepo, v1.entity_id)
@@ -743,7 +778,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "subquery_test@test.com", name: "SubqueryTest", status: "active"})
+          User.changeset(%User{}, %{
+            email: "subquery_test@test.com",
+            name: "SubqueryTest",
+            status: "active"
+          })
         )
 
       {:ok, _client} =
@@ -769,7 +808,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "subquery_v1@test.com", name: "Original", status: "active"})
+          User.changeset(%User{}, %{
+            email: "subquery_v1@test.com",
+            name: "Original",
+            status: "active"
+          })
         )
 
       {:ok, _user1_v2} = ImmuTable.update(TestRepo, user1, %{name: "Updated"})
@@ -777,7 +820,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user2} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "subquery_deleted@test.com", name: "Deleted", status: "active"})
+          User.changeset(%User{}, %{
+            email: "subquery_deleted@test.com",
+            name: "Deleted",
+            status: "active"
+          })
         )
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, user2)
@@ -796,13 +843,21 @@ defmodule ImmuTable.QueryTest do
       {:ok, _user1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "subquery_compose1@test.com", name: "Active", status: "active"})
+          User.changeset(%User{}, %{
+            email: "subquery_compose1@test.com",
+            name: "Active",
+            status: "active"
+          })
         )
 
       {:ok, _user2} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "subquery_compose2@test.com", name: "Inactive", status: "inactive"})
+          User.changeset(%User{}, %{
+            email: "subquery_compose2@test.com",
+            name: "Inactive",
+            status: "inactive"
+          })
         )
 
       results =
@@ -821,7 +876,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "named_default@test.com", name: "NamedDefault", status: "active"})
+          User.changeset(%User{}, %{
+            email: "named_default@test.com",
+            name: "NamedDefault",
+            status: "active"
+          })
         )
 
       {:ok, _client} =
@@ -834,7 +893,10 @@ defmodule ImmuTable.QueryTest do
       results =
         User
         |> ImmuTable.Query.current()
-        |> join(:left, [current: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
+        |> join(:left, [current: u], c in Client,
+          on: u.entity_id == c.user_entity_id,
+          as: :client
+        )
         |> where([current: u, client: c], ilike(c.first_name, "Jane%"))
         |> select([current: u, client: c], {u.name, c.first_name})
         |> TestRepo.all()
@@ -846,7 +908,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "named_custom@test.com", name: "NamedCustom", status: "active"})
+          User.changeset(%User{}, %{
+            email: "named_custom@test.com",
+            name: "NamedCustom",
+            status: "active"
+          })
         )
 
       {:ok, _client} =
@@ -871,7 +937,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "named_v1@test.com", name: "Original", status: "active"})
+          User.changeset(%User{}, %{
+            email: "named_v1@test.com",
+            name: "Original",
+            status: "active"
+          })
         )
 
       {:ok, _user1_v2} = ImmuTable.update(TestRepo, user1, %{name: "Updated"})
@@ -879,7 +949,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user2} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "named_deleted@test.com", name: "Deleted", status: "active"})
+          User.changeset(%User{}, %{
+            email: "named_deleted@test.com",
+            name: "Deleted",
+            status: "active"
+          })
         )
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, user2)
@@ -898,7 +972,11 @@ defmodule ImmuTable.QueryTest do
       {:ok, user} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "multi_join@test.com", name: "MultiJoin", status: "active"})
+          User.changeset(%User{}, %{
+            email: "multi_join@test.com",
+            name: "MultiJoin",
+            status: "active"
+          })
         )
 
       {:ok, client1} =

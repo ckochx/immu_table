@@ -10,11 +10,14 @@ defmodule ImmuTable.MultiTest do
     test "inserts a record within a Multi transaction" do
       result =
         Multi.new()
-        |> ImmuMulti.insert(:user, User.changeset(%User{}, %{
-          email: "alice@test.com",
-          name: "Alice",
-          status: "active"
-        }))
+        |> ImmuMulti.insert(
+          :user,
+          User.changeset(%User{}, %{
+            email: "alice@test.com",
+            name: "Alice",
+            status: "active"
+          })
+        )
         |> TestRepo.transaction()
 
       assert {:ok, %{user: user}} = result
@@ -42,16 +45,23 @@ defmodule ImmuTable.MultiTest do
     test "rolls back all operations on insert failure" do
       result =
         Multi.new()
-        |> ImmuMulti.insert(:user, User.changeset(%User{}, %{
-          email: "valid@test.com",
-          name: "Valid",
-          status: "active"
-        }))
-        |> ImmuMulti.insert(:invalid_user, User.changeset(%User{}, %{
-          email: nil,  # Invalid: email is required
-          name: "Invalid",
-          status: "active"
-        }))
+        |> ImmuMulti.insert(
+          :user,
+          User.changeset(%User{}, %{
+            email: "valid@test.com",
+            name: "Valid",
+            status: "active"
+          })
+        )
+        |> ImmuMulti.insert(
+          :invalid_user,
+          User.changeset(%User{}, %{
+            # Invalid: email is required
+            email: nil,
+            name: "Invalid",
+            status: "active"
+          })
+        )
         |> TestRepo.transaction()
 
       assert {:error, :invalid_user, _changeset, %{user: _user}} = result
@@ -63,11 +73,15 @@ defmodule ImmuTable.MultiTest do
 
   describe "update/4" do
     test "updates a record within a Multi transaction" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "bob@test.com",
-        name: "Bob",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "bob@test.com",
+            name: "Bob",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -81,11 +95,15 @@ defmodule ImmuTable.MultiTest do
     end
 
     test "updates using a function that accesses previous steps" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "charlie@test.com",
-        name: "Charlie",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "charlie@test.com",
+            name: "Charlie",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -100,11 +118,15 @@ defmodule ImmuTable.MultiTest do
     end
 
     test "chains multiple updates in sequence" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "diana@test.com",
-        name: "Diana",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "diana@test.com",
+            name: "Diana",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -125,11 +147,15 @@ defmodule ImmuTable.MultiTest do
 
   describe "delete/3" do
     test "deletes a record within a Multi transaction" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "eve@test.com",
-        name: "Eve",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "eve@test.com",
+            name: "Eve",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -142,11 +168,15 @@ defmodule ImmuTable.MultiTest do
     end
 
     test "deletes using a function that accesses previous steps" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "frank@test.com",
-        name: "Frank",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "frank@test.com",
+            name: "Frank",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -161,11 +191,14 @@ defmodule ImmuTable.MultiTest do
     test "inserts and deletes in same transaction" do
       result =
         Multi.new()
-        |> ImmuMulti.insert(:user, User.changeset(%User{}, %{
-          email: "temp@test.com",
-          name: "Temp",
-          status: "active"
-        }))
+        |> ImmuMulti.insert(
+          :user,
+          User.changeset(%User{}, %{
+            email: "temp@test.com",
+            name: "Temp",
+            status: "active"
+          })
+        )
         |> ImmuMulti.delete(:deleted_user, fn %{user: user} -> user end)
         |> TestRepo.transaction()
 
@@ -178,11 +211,15 @@ defmodule ImmuTable.MultiTest do
 
   describe "undelete/4" do
     test "undeletes a record within a Multi transaction" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "grace@test.com",
-        name: "Grace",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "grace@test.com",
+            name: "Grace",
+            status: "active"
+          })
+        )
 
       {:ok, tombstone} = ImmuTable.delete(TestRepo, user)
 
@@ -198,11 +235,15 @@ defmodule ImmuTable.MultiTest do
     end
 
     test "undeletes using a function that accesses previous steps" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "henry@test.com",
-        name: "Henry",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "henry@test.com",
+            name: "Henry",
+            status: "active"
+          })
+        )
 
       {:ok, tombstone} = ImmuTable.delete(TestRepo, user)
 
@@ -220,11 +261,15 @@ defmodule ImmuTable.MultiTest do
     end
 
     test "delete and undelete in same transaction" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "ivan@test.com",
-        name: "Ivan",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "ivan@test.com",
+            name: "Ivan",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -269,11 +314,15 @@ defmodule ImmuTable.MultiTest do
     end
 
     test "handles errors and rolls back entire transaction" do
-      {:ok, user} = ImmuTable.insert(TestRepo, User.changeset(%User{}, %{
-        email: "kate@test.com",
-        name: "Kate",
-        status: "active"
-      }))
+      {:ok, user} =
+        ImmuTable.insert(
+          TestRepo,
+          User.changeset(%User{}, %{
+            email: "kate@test.com",
+            name: "Kate",
+            status: "active"
+          })
+        )
 
       result =
         Multi.new()
@@ -288,19 +337,25 @@ defmodule ImmuTable.MultiTest do
 
       # Verify rollback
       reloaded_user = TestRepo.get(User, user.id)
-      assert reloaded_user.name == "Kate"  # Not updated
-      assert reloaded_user.version == 1    # Still version 1
-      assert TestRepo.all(Account) == []   # Account was not persisted
+      # Not updated
+      assert reloaded_user.name == "Kate"
+      # Still version 1
+      assert reloaded_user.version == 1
+      # Account was not persisted
+      assert TestRepo.all(Account) == []
     end
 
     test "full lifecycle: insert, update, delete, undelete" do
       result =
         Multi.new()
-        |> ImmuMulti.insert(:user, User.changeset(%User{}, %{
-          email: "leo@test.com",
-          name: "Leo",
-          status: "active"
-        }))
+        |> ImmuMulti.insert(
+          :user,
+          User.changeset(%User{}, %{
+            email: "leo@test.com",
+            name: "Leo",
+            status: "active"
+          })
+        )
         |> ImmuMulti.update(:updated, fn %{user: user} ->
           {user, %{name: "Leo Updated"}}
         end)

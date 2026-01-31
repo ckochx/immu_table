@@ -137,8 +137,9 @@ defmodule ImmuTable.Associations do
 
   # Has_many preloading
   defp preload_has_many_list(struct_or_structs, repo, assoc, assoc_module, opts) do
-    foreign_key = Keyword.get(opts, :foreign_key) ||
-      raise ArgumentError, "has_many associations require :foreign_key option"
+    foreign_key =
+      Keyword.get(opts, :foreign_key) ||
+        raise ArgumentError, "has_many associations require :foreign_key option"
 
     # Collect all entity_ids from parent structs
     parent_entity_ids =
@@ -172,8 +173,9 @@ defmodule ImmuTable.Associations do
   end
 
   defp preload_has_many_single(struct, repo, assoc, assoc_module, opts) do
-    foreign_key = Keyword.get(opts, :foreign_key) ||
-      raise ArgumentError, "has_many associations require :foreign_key option"
+    foreign_key =
+      Keyword.get(opts, :foreign_key) ||
+        raise ArgumentError, "has_many associations require :foreign_key option"
 
     import Ecto.Query
 
@@ -188,8 +190,9 @@ defmodule ImmuTable.Associations do
 
   # Has_one preloading
   defp preload_has_one_list(struct_or_structs, repo, assoc, assoc_module, opts) do
-    foreign_key = Keyword.get(opts, :foreign_key) ||
-      raise ArgumentError, "has_one associations require :foreign_key option"
+    foreign_key =
+      Keyword.get(opts, :foreign_key) ||
+        raise ArgumentError, "has_one associations require :foreign_key option"
 
     # Collect all entity_ids from parent structs
     parent_entity_ids =
@@ -225,8 +228,9 @@ defmodule ImmuTable.Associations do
   end
 
   defp preload_has_one_single(struct, repo, assoc, assoc_module, opts) do
-    foreign_key = Keyword.get(opts, :foreign_key) ||
-      raise ArgumentError, "has_one associations require :foreign_key option"
+    foreign_key =
+      Keyword.get(opts, :foreign_key) ||
+        raise ArgumentError, "has_one associations require :foreign_key option"
 
     import Ecto.Query
 
@@ -264,8 +268,9 @@ defmodule ImmuTable.Associations do
 
       type when type in [:has_many, :has_one] ->
         # Child has foreign_key field pointing to parent's entity_id
-        foreign_key = Keyword.get(opts, :foreign_key) ||
-          raise ArgumentError, "#{type} associations require :foreign_key option for join/2"
+        foreign_key =
+          Keyword.get(opts, :foreign_key) ||
+            raise ArgumentError, "#{type} associations require :foreign_key option for join/2"
 
         from(q in query,
           join: a in subquery(current_assoc_query),

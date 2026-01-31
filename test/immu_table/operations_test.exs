@@ -286,7 +286,11 @@ defmodule ImmuTable.OperationsTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "invalid@example.com", name: "Invalid", status: "active"})
+          User.changeset(%User{}, %{
+            email: "invalid@example.com",
+            name: "Invalid",
+            status: "active"
+          })
         )
 
       changeset = User.changeset(v1, %{email: "not-an-email"})
@@ -311,7 +315,11 @@ defmodule ImmuTable.OperationsTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "deleted@example.com", name: "ToDelete", status: "active"})
+          User.changeset(%User{}, %{
+            email: "deleted@example.com",
+            name: "ToDelete",
+            status: "active"
+          })
         )
 
       {:ok, _deleted} = ImmuTable.delete(TestRepo, v1)
@@ -391,7 +399,11 @@ defmodule ImmuTable.OperationsTest do
       {:ok, v1} =
         ImmuTable.insert(
           TestRepo,
-          User.changeset(%User{}, %{email: "raiseinvalid@example.com", name: "RaiseInvalid", status: "active"})
+          User.changeset(%User{}, %{
+            email: "raiseinvalid@example.com",
+            name: "RaiseInvalid",
+            status: "active"
+          })
         )
 
       assert_raise Ecto.InvalidChangesetError, fn ->
@@ -695,7 +707,8 @@ defmodule ImmuTable.OperationsTest do
       {:ok, v1} = ImmuTable.insert(TestRepo, %Account{name: "Checking", balance: 100})
       fake_entity_id = UUIDv7.generate()
 
-      {:ok, v2} = ImmuTable.update(TestRepo, v1, %{"balance" => 200, "entity_id" => fake_entity_id})
+      {:ok, v2} =
+        ImmuTable.update(TestRepo, v1, %{"balance" => 200, "entity_id" => fake_entity_id})
 
       assert v2.entity_id == v1.entity_id
       refute v2.entity_id == fake_entity_id

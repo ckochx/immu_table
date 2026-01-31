@@ -48,9 +48,7 @@ defmodule Mix.Immutable.Generator do
 
   def validate_module!(name, task_name) do
     unless valid_module?(name) do
-      Mix.raise(
-        "expected the #{task_name} argument, #{inspect(name)}, to be a valid module name"
-      )
+      Mix.raise("expected the #{task_name} argument, #{inspect(name)}, to be a valid module name")
     end
   end
 
@@ -93,7 +91,9 @@ defmodule Mix.Immutable.Generator do
   def schema_type(:text, _), do: ":string"
   def schema_type(type, _), do: inspect(type)
 
-  def migration_type(:references, table), do: "references(:#{table}, column: :entity_id, type: :uuid)"
+  def migration_type(:references, table),
+    do: "references(:#{table}, column: :entity_id, type: :uuid)"
+
   def migration_type(type, _), do: inspect(type)
 
   def copy_from(source_dir, binding, files) do

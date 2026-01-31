@@ -103,8 +103,8 @@ defmodule ImmuTable.MigrationTest do
 
       # Check for composite (entity_id, version) index
       assert Enum.any?(index_defs, fn def_str ->
-        String.contains?(def_str, "entity_id") and String.contains?(def_str, "version")
-      end)
+               String.contains?(def_str, "entity_id") and String.contains?(def_str, "version")
+             end)
 
       # Check for valid_from index
       assert Enum.any?(index_defs, &String.contains?(&1, "valid_from"))
@@ -169,8 +169,8 @@ defmodule ImmuTable.MigrationTest do
 
       # Check for composite (entity_id, version) index
       assert Enum.any?(index_defs, fn def_str ->
-        String.contains?(def_str, "entity_id") and String.contains?(def_str, "version")
-      end)
+               String.contains?(def_str, "entity_id") and String.contains?(def_str, "version")
+             end)
 
       # Check for valid_from index
       assert Enum.any?(index_defs, &String.contains?(&1, "valid_from"))
@@ -237,9 +237,7 @@ defmodule ImmuTable.MigrationTest do
       "CREATE INDEX #{table_name}_entity_id_version_index ON #{table_name} (entity_id, version)"
     )
 
-    TestRepo.query!(
-      "CREATE INDEX #{table_name}_valid_from_index ON #{table_name} (valid_from)"
-    )
+    TestRepo.query!("CREATE INDEX #{table_name}_valid_from_index ON #{table_name} (valid_from)")
   end
 
   defp get_table_columns(table_name) do

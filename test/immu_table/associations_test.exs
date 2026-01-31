@@ -256,7 +256,11 @@ defmodule ImmuTable.AssociationsTest do
         |> ImmuTable.preload(TestRepo, :projects)
 
       assert length(loaded_org.projects) == 2
-      assert Enum.map(loaded_org.projects, & &1.title) |> Enum.sort() == ["Project Alpha", "Project Beta"]
+
+      assert Enum.map(loaded_org.projects, & &1.title) |> Enum.sort() == [
+               "Project Alpha",
+               "Project Beta"
+             ]
     end
 
     test "preloads empty list when no associated records" do

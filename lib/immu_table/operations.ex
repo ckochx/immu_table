@@ -451,6 +451,7 @@ defmodule ImmuTable.Operations do
       {key, value}, acc when is_binary(key) ->
         try do
           atom_key = String.to_existing_atom(key)
+
           if MapSet.member?(valid_fields, atom_key) do
             Map.put(acc, atom_key, value)
           else
