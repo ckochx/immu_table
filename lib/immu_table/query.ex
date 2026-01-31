@@ -28,14 +28,14 @@ defmodule ImmuTable.Query do
           User
           |> ImmuTable.Query.current(as: :user)
           |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
-          |> where([user: u, client: c], ilike(c.first_name, ^pattern))
+          |> where([user: u, client: c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
           |> Repo.all()
 
   2. Use `get_current_subquery/1` for simple positional bindings:
 
           from(u in ImmuTable.Query.get_current_subquery(User))
           |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
-          |> where([u, c], ilike(c.first_name, ^pattern))
+          |> where([u, c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
           |> Repo.all()
 
   3. Account for the internal binding if using this function directly:
@@ -43,7 +43,7 @@ defmodule ImmuTable.Query do
           User
           |> ImmuTable.Query.get_current()
           |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
-          |> where([u, _internal, c], ilike(c.first_name, ^pattern))
+          |> where([u, _internal, c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
           |> Repo.all()
 
   ## Examples
@@ -94,13 +94,13 @@ defmodule ImmuTable.Query do
       User
       |> ImmuTable.Query.get_current_subquery()
       |> join(:left, [u], c in Client, on: u.entity_id == c.user_entity_id)
-      |> where([u, c], ilike(c.first_name, ^pattern))
+      |> where([u, c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
       |> Repo.all()
 
       # Wrap in from() if you want to add a named binding:
       from(u in ImmuTable.Query.get_current_subquery(User), as: :user)
       |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
-      |> where([user: u, client: c], ilike(c.first_name, ^pattern))
+      |> where([user: u, client: c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
       |> Repo.all()
 
   ## See Also
@@ -132,7 +132,7 @@ defmodule ImmuTable.Query do
       User
       |> ImmuTable.Query.current()
       |> join(:left, [current: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
-      |> where([current: u, client: c], ilike(c.first_name, ^pattern))
+      |> where([current: u, client: c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
       |> select([current: u, client: c], {u.name, c.first_name})
       |> Repo.all()
 
@@ -140,7 +140,7 @@ defmodule ImmuTable.Query do
       User
       |> ImmuTable.Query.current(as: :user)
       |> join(:left, [user: u], c in Client, on: u.entity_id == c.user_entity_id, as: :client)
-      |> where([user: u, client: c], ilike(c.first_name, ^pattern))
+      |> where([user: u, client: c], fragment("lower(?) LIKE lower(?)", c.first_name, ^pattern))
       |> Repo.all()
 
   ## Why Named Bindings?
